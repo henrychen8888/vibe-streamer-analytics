@@ -1,0 +1,11 @@
+{
+  "_说明": "复制为 config.json 后填写。client_key/client_secret 来自抖音开放平台控制台；access_token/refresh_token/open_ids 由 run.py oauth 授权流程写入。endpoints 可覆盖官方接口路径（以控制台为准）。",
+  "_授权边界": "OAuth 仅返回已授权账号自身数据，无法拉取任意第三方达人；请勿把本文件提交到版本库。",
+  "client_key": "",
+  "client_secret": "",
+  "redirect_uri": "https://your-domain.example.com/oauth/callback",
+  "access_token": "",
+  "refresh_token": "",
+  "open_ids": [],
+  "endpoints": {}
+}
