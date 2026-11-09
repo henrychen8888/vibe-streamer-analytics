@@ -1,0 +1,626 @@
+#!/usr/bin/env node
+'use strict';
+
+/*
+ * ghpub — 发布本地文件夹到 GitHub 的零依赖 CLI
+ * 行为：仓库不存在则建仓并推送；已存在则推送，可选打 tag / 创建 Release。
+ * 传输方式：
+ *   --transport git (默认) 使用本地 git 客户端 + 远程推送
+ *   --transport api        纯 REST API 上传（走 api.github.com，绕开 git 协议，
+ *                          适合受限网络无法直连 github.com 主域的环境）
+ * 仅使用 Node 内置模块（fetch + child_process），无需 npm install。
+ */
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { execFileSync } = require('child_process');
+
+const VERSION = '2026.11.4.1';
+const CONFIG_DIR = path.join(os.homedir(), '.config', 'ghpub');
+const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+const API_BASE = 'https://api.github.com';
+
+/* ----------------------------- 输出工具 ----------------------------- */
+const C = {
+  reset: '\x1b[0m', green: '\x1b[32m', red: '\x1b[31m',
+  yellow: '\x1b[33m', cyan: '\x1b[36m', dim: '\x1b[2m', bold: '\x1b[1m',
+};
+const ok = (m) => console.log(`${C.green}✓${C.reset} ${m}`);
+const fail = (m) => console.log(`${C.red}✗${C.reset} ${m}`);
+const warn = (m) => console.log(`${C.yellow}⚠${C.reset} ${m}`);
+const info = (m) => console.log(`${C.cyan}•${C.reset} ${m}`);
+const dim = (m) => console.log(`${C.dim}${m}${C.reset}`);
+
+function exit(msg, code = 1) {
+  if (msg) fail(msg);
+  process.exit(code);
+}
+
+/* ----------------------------- 配置读写 ----------------------------- */
+function readConfig() {
+  try {
+    return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+  } catch {
+    return { token: null, host: API_BASE, user: null };
+  }
+}
+function writeConfig(cfg) {
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+  fs.chmodSync(CONFIG_FILE, 0o600); // 凭证仅本人可读
+}
+
+/* ----------------------------- GitHub API ----------------------------- */
+function encPath(p) { return String(p).split('/').map(encodeURIComponent).join('/'); }
+
+function makeApi(token, host = API_BASE) {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'ghpub',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  async function req(method, p, body) {
+    const res = await fetch(host + p, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    return { status: res.status, data };
+  }
+  return {
+    host,
+    async getUser() {
+      const { status, data } = await req('GET', '/user');
+      if (status !== 200) throw new Error(`获取用户失败 (${status}): ${JSON.stringify(data && data.message)}`);
+      return data;
+    },
+    async repoExists(owner, repo) {
+      const { status } = await req('GET', `/repos/${owner}/${repo}`);
+      if (status === 200) return true;
+      if (status === 404) return false;
+      throw new Error(`检查仓库存在性失败 (${status})`);
+    },
+    async createRepo({ repo, description, private: isPrivate }) {
+      const { status, data } = await req('POST', '/user/repos', {
+        name: repo,
+        description: description || '',
+        private: !!isPrivate,
+        auto_init: false,
+        has_issues: true,
+        has_wiki: false,
+      });
+      if (status !== 201) throw new Error(`创建仓库失败 (${status}): ${JSON.stringify(data && data.message)}`);
+      return data;
+    },
+    async getReleaseByTag(owner, repo, tag) {
+      const { status, data } = await req('GET', `/repos/${owner}/${repo}/releases/tags/${tag}`);
+      if (status === 200) return data;
+      if (status === 404) return null;
+      throw new Error(`查询 Release 失败 (${status})`);
+    },
+    async createRelease(owner, repo, version, body, assets) {
+      const tag = `v${version}`;
+      // 幂等：同名 Release 已存在则复用，避免 CI 重跑触发 422
+      const existing = await this.getReleaseByTag(owner, repo, tag);
+      if (existing) {
+        warn(`Release ${tag} 已存在，跳过创建`);
+        return existing;
+      }
+      const { status, data } = await req('POST', `/repos/${owner}/${repo}/releases`, {
+        tag_name: tag,
+        name: tag,
+        body: body || `Release ${tag}`,
+        draft: false,
+        prerelease: false,
+      });
+      if (status !== 201) throw new Error(`创建 Release 失败 (${status}): ${JSON.stringify(data && data.message)}`);
+      if (Array.isArray(assets) && assets.length) {
+        for (const fp of assets) {
+          if (!fs.existsSync(fp)) { warn(`附件不存在，跳过: ${fp}`); continue; }
+          await this.uploadReleaseAsset(owner, repo, data.id, fp);
+          ok(`已上传 Release 附件: ${path.basename(fp)}`);
+        }
+      }
+      return data;
+    },
+    async uploadReleaseAsset(owner, repo, releaseId, filePath) {
+      const name = path.basename(filePath);
+      const buf = fs.readFileSync(filePath);
+      const uploadHost = (host === API_BASE) ? 'https://uploads.github.com' : host;
+      const url = `${uploadHost}/repos/${owner}/${repo}/releases/${releaseId}/assets?name=${encodeURIComponent(name)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'User-Agent': 'ghpub',
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/octet-stream',
+        },
+        body: buf,
+      });
+      const text = await res.text();
+      let data = null;
+      try { data = JSON.parse(text); } catch { data = text; }
+      if (res.status !== 201) throw new Error(`上传 Release 附件 ${name} 失败 (${res.status}): ${JSON.stringify(data && data.message)}`);
+      return data;
+    },
+    // —— Git Data API：用于绕过 Contents API 对 .github/workflows 等路径的 404 限制 ——
+    async getTree(owner, repo, sha) {
+      const { status, data } = await req('GET', `/repos/${owner}/${repo}/git/trees/${sha}?recursive=1`);
+      if (status !== 200) throw new Error(`获取树失败 (${status})`);
+      return data;
+    },
+    async createBlob(owner, repo, content) {
+      const { status, data } = await req('POST', `/repos/${owner}/${repo}/git/blobs`, { content, encoding: 'base64' });
+      if (status !== 201) throw new Error(`创建 blob 失败 (${status})`);
+      return data.sha;
+    },
+    async createTree(owner, repo, baseTree, entries) {
+      const { status, data } = await req('POST', `/repos/${owner}/${repo}/git/trees`, { base_tree: baseTree, tree: entries });
+      if (status !== 201) throw new Error(`创建树失败 (${status})`);
+      return data.sha;
+    },
+    async getCommit(owner, repo, sha) {
+      const { status, data } = await req('GET', `/repos/${owner}/${repo}/git/commits/${sha}`);
+      if (status !== 200) throw new Error(`获取 commit 失败 (${status})`);
+      return data;
+    },
+    async createCommit(owner, repo, message, tree, parents) {
+      const { status, data } = await req('POST', `/repos/${owner}/${repo}/git/commits`, { message, tree, parents });
+      if (status !== 201) throw new Error(`创建 commit 失败 (${status})`);
+      return data.sha;
+    },
+    async updateRef(owner, repo, ref, sha) {
+      const { status, data } = await req('PATCH', `/repos/${owner}/${repo}/git/refs/${ref}`, { sha, force: true });
+      if (status !== 200) throw new Error(`更新 ref 失败 (${status})`);
+      return data;
+    },
+    // 经 Git Data API 提交单个文件（绕过 Contents API 对 .github/workflows 的 404 限制）
+    async commitFile(owner, repo, branch, filePath, contentBase64, message) {
+      const refRes = await this.getRef(owner, repo, `heads/${branch}`);
+      const commitSha = refRes.object.sha;
+      const baseTree = (await this.getCommit(owner, repo, commitSha)).tree.sha;
+      const blobSha = await this.createBlob(owner, repo, contentBase64);
+      const newTree = await this.createTree(owner, repo, baseTree, [
+        { path: filePath, mode: '100644', type: 'blob', sha: blobSha },
+      ]);
+      const newCommitSha = await this.createCommit(owner, repo, message, newTree, [commitSha]);
+      await this.updateRef(owner, repo, `heads/${branch}`, newCommitSha);
+      return newCommitSha;
+    },
+    // —— 以下内容走纯 REST API（绕开 git 协议，适合受限网络）——
+    async getContent(owner, repo, p, ref) {
+      const q = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+      const { status, data } = await req('GET', `/repos/${owner}/${repo}/contents/${encPath(p)}${q}`);
+      if (status === 200) return data;
+      if (status === 404) return null;
+      throw new Error(`读取 ${p} 失败 (${status})`);
+    },
+    async putContent(owner, repo, p, content, message, sha, branch) {
+      const body = { message, content, branch };
+      if (sha) body.sha = sha;
+      return req('PUT', `/repos/${owner}/${repo}/contents/${encPath(p)}`, body);
+    },
+    async getBranchHead(owner, repo, branch) {
+      const { status, data } = await req('GET', `/repos/${owner}/${repo}/git/refs/heads/${branch}`);
+      if (status === 200) return data;
+      throw new Error(`分支 ${branch} 不存在 (${status})`);
+    },
+    async getRef(owner, repo, ref) {
+      const { status, data } = await req('GET', `/repos/${owner}/${repo}/git/refs/${ref}`);
+      if (status === 200) return data;
+      if (status === 404) return null;
+      throw new Error(`查询 ref ${ref} 失败 (${status})`);
+    },
+    async createTagRef(owner, repo, tag, sha) {
+      const { status, data } = await req('POST', `/repos/${owner}/${repo}/git/refs`, { ref: `refs/tags/${tag}`, sha });
+      if (status !== 201) throw new Error(`创建 tag ${tag} 失败 (${status}): ${JSON.stringify(data && data.message)}`);
+      return data;
+    },
+  };
+}
+
+/* ----------------------------- 参数解析 ----------------------------- */
+function parseFlags(args) {
+  const out = { _: [] };
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--dry-run') out.dryRun = true;
+    else if (a === '--private') out.private = true;
+    else if (a === '--release') out.release = true;
+    else if (a === '--token') out.token = args[++i];
+    else if (a === '--host') out.host = args[++i];
+    else if (a === '--repo') out.repo = args[++i];
+    else if (a === '--owner') out.owner = args[++i];
+    else if (a === '--branch') out.branch = args[++i];
+    else if (a === '--version') out.version = args[++i];
+    else if (a === '--changelog') out.changelog = args[++i];
+    else if (a === '--transport') out.transport = args[++i];
+    else if (a === '--asset' || a === '--assets') {
+      const v = args[++i];
+      if (!out.assets) out.assets = [];
+      if (v && v.includes(',')) out.assets.push(...v.split(',').map((s) => s.trim()).filter(Boolean));
+      else if (v) out.assets.push(v);
+    }
+    else if (a === '--help' || a === '-h') out.help = true;
+    else out._.push(a);
+  }
+  return out;
+}
+
+/* ----------------------------- frontmatter ----------------------------- */
+function parseFrontmatter(file) {
+  try {
+    const txt = fs.readFileSync(file, 'utf8');
+    const m = txt.match(/^---\s*\n([\s\S]*?)\n---/);
+    if (!m) return {};
+    const fm = {};
+    for (const line of m[1].split('\n')) {
+      const mm = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
+      if (mm) fm[mm[1]] = mm[2].replace(/^["']|["']$/g, '').trim();
+    }
+    return fm;
+  } catch {
+    return {};
+  }
+}
+
+function slugify(s) {
+  return String(s).toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100) || 'repo';
+}
+
+/* ----------------------------- 元数据采集 ----------------------------- */
+function gatherMeta(folder, opts) {
+  let fm = {};
+  const skillMd = path.join(folder, 'SKILL.md');
+  if (fs.existsSync(skillMd)) fm = parseFrontmatter(skillMd);
+
+  let repo = opts.repo
+    || fm.slug
+    || slugify(path.basename(folder));
+  repo = slugify(repo);
+
+  let version = opts.version || fm.version;
+  if (!version) {
+    const pkg = path.join(folder, 'package.json');
+    if (fs.existsSync(pkg)) {
+      try { version = JSON.parse(fs.readFileSync(pkg, 'utf8')).version; } catch {}
+    }
+  }
+  version = version || '1.0.0';
+
+  const description = fm.summary || fm.displayName || opts.repo || path.basename(folder);
+
+  return { repo, version, description, hasSkillMd: Object.keys(fm).length > 0, frontmatter: fm };
+}
+
+/* ----------------------------- git 操作 ----------------------------- */
+function git(args, cwd, silent = true) {
+  return execFileSync('git', args, {
+    cwd,
+    stdio: silent ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+  });
+}
+
+// 从 origin 远程反解 owner/repo（CI 中发布「当前仓库」时使用）
+function getOriginRepo(folder) {
+  let url = '';
+  try { url = git(['remote', 'get-url', 'origin'], folder).toString().trim(); }
+  catch { return null; }
+  // 支持形如 git@github.com:owner/repo.git 与 https://github.com/owner/repo(.git)
+  const m = url.match(/github\.com[:/]([^/]+)\/(.+?)(?:\.git)?$/);
+  if (!m) return null;
+  return { owner: m[1], repo: m[2] };
+}
+
+async function gitPublish(folder, o) {
+  if (!fs.existsSync(path.join(folder, '.git'))) {
+    git(['init', '-q'], folder);
+    try { git(['branch', '-M', 'main'], folder); } catch {}
+    ok('已初始化本地 git 仓库 (默认分支 main)');
+  }
+
+  // remote
+  let remotes = '';
+  try { remotes = git(['remote'], folder).toString(); } catch {}
+  const hasOrigin = remotes.split('\n').includes('origin');
+  const plainUrl = `https://github.com/${o.owner}/${o.repo}.git`;
+  if (!hasOrigin) {
+    git(['remote', 'add', 'origin', plainUrl], folder);
+    info('已添加远程 origin');
+  }
+
+  // commit
+  const status = git(['status', '--porcelain'], folder).toString();
+  if (status.trim()) {
+    git(['add', '-A'], folder);
+    git(['commit', '-q', '-m', o.changelog || `publish v${o.version}`], folder);
+    ok('本地提交完成');
+  } else {
+    warn('无新增变更，跳过 commit');
+  }
+
+  // 分支（处理 tag 触发时的 detached HEAD）
+  let branch = o.branch;
+  if (!branch) branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], folder).toString().trim();
+  const detached = (branch === 'HEAD');
+
+  // tag（release 场景）
+  if (o.release) {
+    const tag = `v${o.version}`;
+    let exists = false;
+    try { git(['rev-parse', tag], folder); exists = true; } catch {}
+    if (!exists) {
+      git(['tag', '-a', tag, '-m', o.changelog || tag], folder);
+      ok(`已创建本地 tag ${tag}`);
+    }
+  }
+
+  // 推送（token 经 insteadOf 注入，不落盘 .git/config）
+  const insteadOf = `url.https://${o.token}@github.com/.insteadOf=https://github.com/`;
+  if (detached) {
+    // 处于 tag 的 detached HEAD：仅推送 tag（如有），远程固定为 origin
+    if (o.release) {
+      git(['-c', insteadOf, 'push', 'origin', '--tags'], folder, false);
+      ok(`已推送 tag 到 ${o.owner}/${o.repo}`);
+    }
+  } else {
+    const pushArgs = ['-c', insteadOf, 'push', '-u', 'origin', branch];
+    if (o.release) pushArgs.push('--tags');
+    git(pushArgs, folder, false);
+    ok(`已推送 ${o.owner}/${o.repo}@${branch}${o.release ? ' (含 tag)' : ''}`);
+  }
+}
+
+/* ----------------------------- API 上传模式 ----------------------------- */
+// 纯 REST API 上传：遍历文件夹，逐个 PUT /contents；再建 tag ref + Release。
+// 不走 git 协议，适合受限网络（如仅放行 api.github.com 的环境）。
+async function apiPublish(folder, o, api) {
+  const branch = o.branch || 'main';
+  const message = o.changelog || `publish v${o.version}`;
+
+  // 递归收集文件，跳过 .git / node_modules
+  const files = [];
+  (function walk(dir) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === '.git' || e.name === 'node_modules') continue;
+      const fp = path.join(dir, e.name);
+      if (e.isDirectory()) walk(fp);
+      else files.push(fp);
+    }
+  })(folder);
+
+  info(`将通过 API 上传 ${files.length} 个文件到 ${o.owner}/${o.repo}@${branch}（绕开 git 协议）`);
+  for (const fp of files) {
+    const rel = path.relative(folder, fp).split(path.sep).join('/');
+    const buf = fs.readFileSync(fp);
+    if (buf.length > 1024 * 1024) {
+      warn(`跳过 ${rel}（单文件超过 1MB，GitHub Contents API 限制；请用 git 模式）`);
+      continue;
+    }
+    const b64 = buf.toString('base64');
+    let sha;
+    try {
+      const ex = await api.getContent(o.owner, o.repo, rel, branch);
+      if (ex && ex.sha) sha = ex.sha; // 已存在 → 更新需带 sha
+    } catch { /* 404 表示不存在，直接创建 */ }
+    const res = await api.putContent(o.owner, o.repo, rel, b64, message, sha, branch);
+    if (res.status !== 200 && res.status !== 201) {
+      // Contents API 对 .github/workflows 等路径返回 404，改用 Git Data API 提交
+      if (res.status === 404) {
+        await api.commitFile(o.owner, o.repo, branch, rel, b64, message);
+        ok(`已上传 ${rel}（经 Git Data API）`);
+        continue;
+      }
+      throw new Error(`上传 ${rel} 失败 (${res.status}): ${JSON.stringify(res.data && res.data.message)}`);
+    }
+    ok(`已上传 ${rel}`);
+  }
+
+  // 建 tag
+  if (o.release) {
+    const tag = `v${o.version}`;
+    let headSha;
+    try {
+      const ref = await api.getBranchHead(o.owner, o.repo, branch);
+      headSha = ref.object.sha;
+    } catch (e) {
+      throw new Error(`获取 ${branch} 分支 HEAD 失败: ${e.message}`);
+    }
+    let exists = false;
+    try { await api.getRef(o.owner, o.repo, `tags/${tag}`); exists = true; } catch {}
+    if (!exists) {
+      await api.createTagRef(o.owner, o.repo, tag, headSha);
+      ok(`已创建 tag ${tag}`);
+    } else {
+      warn(`tag ${tag} 已存在，跳过`);
+    }
+  }
+}
+
+/* ----------------------------- 命令实现 ----------------------------- */
+async function cmdLogin(opts) {
+  const token = opts.token || process.env.GH_TOKEN;
+  if (!token) exit('缺少 token：请使用 --token <PAT> 或设置环境变量 GH_TOKEN');
+  const host = opts.host || API_BASE;
+  const api = makeApi(token, host);
+  let user;
+  try { user = await api.getUser(); }
+  catch (e) { exit(e.message); }
+  const cfg = readConfig();
+  cfg.token = token; cfg.host = host; cfg.user = { login: user.login, id: user.id };
+  writeConfig(cfg);
+  ok(`Logged in as @${user.login} (userId=${user.id})`);
+}
+
+async function cmdWhoami() {
+  const cfg = readConfig();
+  const token = cfg.token || process.env.GH_TOKEN;
+  if (!token) exit('尚未登录，请先执行: ghpub login --token <PAT> 或设置环境变量 GH_TOKEN');
+  const api = makeApi(token, cfg.host || API_BASE);
+  let user;
+  try { user = await api.getUser(); }
+  catch (e) { exit(e.message); }
+  console.log(`userId : ${user.id}`);
+  console.log(`login  : ${user.login}`);
+  console.log(`name   : ${user.name || user.login}`);
+  console.log(`role   : ${user.type}`);
+  if (user.email) console.log(`email  : ${user.email}`);
+}
+
+async function cmdPublish(opts) {
+  const folder = opts._[0];
+  if (!folder) exit('缺少文件夹参数：ghpub publish <文件夹> [选项]');
+  const abs = path.resolve(folder);
+  if (!fs.existsSync(abs)) exit(`文件夹不存在: ${abs}`);
+
+  const meta = gatherMeta(abs, opts);
+
+  // 解析最终 owner/repo：
+  //   显式 --owner/--repo 优先 → 其次从 origin 远程反解（CI 发布当前仓库）→ 最后用 slug/文件夹名
+  const origin = getOriginRepo(abs);
+  const ownerResolved = opts.owner || (origin && origin.owner) || null;
+  const repoResolved = opts.repo || (origin && origin.repo) || meta.repo;
+  meta.repo = repoResolved;
+
+  if (opts.dryRun) {
+    info('本地校验模式（不连接 GitHub、不推送）');
+    console.log(`  repo       : ${meta.repo}`);
+    console.log(`  version    : ${meta.version}`);
+    console.log(`  description: ${meta.description}`);
+    console.log(`  SKILL.md   : ${meta.hasSkillMd ? '已识别 frontmatter' : '未找到（使用文件夹名作为仓库名）'}`);
+    console.log(`  target     : ${ownerResolved || '<你的登录账号>'}/${meta.repo}`);
+    console.log(`  private    : ${opts.private ? '是' : '否(公开)'}`);
+    console.log(`  release    : ${opts.release ? `打 tag v${meta.version} 并创建 Release` : '否'}`);
+    console.log(`  assets     : ${opts.assets && opts.assets.length ? opts.assets.map((x) => path.basename(x)).join(', ') : '无（文件进仓库）'}`);
+    console.log(`  transport  : ${opts.transport === 'api' ? 'API (纯 REST，绕开 git)' : 'git (默认)'}`);
+    const skillMd = path.join(abs, 'SKILL.md');
+    if (fs.existsSync(skillMd)) {
+      const fm = parseFrontmatter(skillMd);
+      for (const k of ['slug', 'displayName', 'version', 'summary', 'license']) {
+        if (!fm[k]) warn(`SKILL.md frontmatter 缺少字段: ${k}`);
+      }
+    }
+    ok(`Dry-run passed: ${meta.repo}@${meta.version}`);
+    return;
+  }
+
+  const cfg = readConfig();
+  const token = cfg.token || process.env.GH_TOKEN;
+  if (!token) exit('尚未登录，请先执行: ghpub login --token <PAT> 或设置环境变量 GH_TOKEN');
+  const api = makeApi(token, opts.host || cfg.host || API_BASE);
+
+  // CI（GitHub Actions）使用的 GITHUB_TOKEN 无权访问 GET /user，
+  // 因此仅当 owner 无法从 origin 远程 / --owner 解析时才查 /user，且失败不再致命。
+  let owner = ownerResolved;
+  if (!owner) {
+    try { owner = (await api.getUser()).login; }
+    catch (e) { exit(`无法解析目标 owner（CI 中请确保 origin 远程已设置，或传入 --owner）: ${e.message}`); }
+  }
+
+  const exists = await api.repoExists(owner, meta.repo);
+  if (!exists) {
+    info(`仓库 ${owner}/${meta.repo} 不存在，正在创建...`);
+    await api.createRepo({ repo: meta.repo, description: meta.description, private: opts.private });
+    ok(`已创建仓库 ${owner}/${meta.repo}`);
+  } else {
+    info(`仓库 ${owner}/${meta.repo} 已存在，执行更新推送`);
+  }
+
+  if (opts.transport === 'api') {
+    await apiPublish(abs, {
+      owner, repo: meta.repo, token,
+      version: meta.version, changelog: opts.changelog,
+      release: opts.release, branch: opts.branch,
+    }, api);
+  } else {
+    await gitPublish(abs, {
+      owner, repo: meta.repo, token,
+      version: meta.version, changelog: opts.changelog,
+      release: opts.release, branch: opts.branch,
+    });
+  }
+
+  if (opts.release) {
+    await api.createRelease(owner, meta.repo, meta.version, opts.changelog, opts.assets);
+    ok(`已创建 Release v${meta.version}`);
+  }
+  ok(`Published: https://github.com/${owner}/${meta.repo}`);
+}
+
+function cmdHelp() {
+  console.log(`${C.bold}ghpub${C.reset} — 发布本地文件夹到 GitHub 的零依赖 CLI  v${VERSION}
+${C.dim}仓库不存在则建仓并推送；已存在则推送，可选打 tag / 创建 Release${C.reset}
+
+${C.bold}用法${C.reset}
+  ghpub login    --token <PAT> [--host https://api.github.com]
+  ghpub whoami
+  ghpub publish  <文件夹> [选项]
+  ghpub --version
+
+${C.bold}publish 选项${C.reset}
+  --repo <名称>      指定仓库名（默认取 SKILL.md 的 slug 或文件夹名）
+  --owner <账号/组织> 推送到指定 owner（默认登录账号）
+  --private          创建为私有仓库
+  --release          推送后打 vX.Y.Z tag 并创建 GitHub Release
+  --changelog "说明"  提交 / Release 说明
+  --branch <分支>     指定推送分支（默认当前分支 / main）
+  --version <版本>    覆盖版本号（默认取 SKILL.md / package.json / 1.0.0）
+  --transport <git|api>  传输方式：git=本地 git 推送(默认)；api=纯 REST 上传，
+                      绕开 git 协议，适合受限网络无法直连 github.com 主域
+  --asset <文件路径>    作为 GitHub Release 附件上传（可多次使用，或用
+                      --assets "a.zip,b.zip" 逗号分隔）。附件不会写入仓库文件，
+                      而是挂在 Release 下载区（适合打包产物 / 大文件）。
+  --dry-run          仅本地校验，不连接 GitHub、不推送
+
+${C.bold}示例${C.reset}
+  ghpub publish ~/my-first-skill --dry-run
+  ghpub publish ~/my-first-skill --changelog "首次发布"
+  ghpub publish ~/my-first-skill --release --changelog "v1.0.0 首发"
+  ghpub publish ~/my-first-skill --transport api --release   # 受限网络用 API 上传
+  ghpub publish ~/my-first-skill --release --asset dist.zip  # 把 zip 挂到 Release 下载区
+
+${C.bold}说明${C.reset}
+  - 凭证保存在 ${CONFIG_DIR}，权限 600，仅本人可读
+  - 也可通过环境变量 GH_TOKEN 提供令牌（适合 CI）
+  - git 模式：token 经 git insteadOf 注入推送，不写入 .git/config
+  - api 模式：文件经 GitHub Contents API 上传（单文件 ≤ 1MB），无需 git 客户端
+  - --asset 附件经 GitHub uploads API 上传（支持大文件，与仓库文件分离）
+`);
+}
+
+/* ----------------------------- 入口 ----------------------------- */
+async function main() {
+  const argv = process.argv.slice(2);
+  const cmd = argv[0];
+  const opts = parseFlags(argv.slice(1));
+
+  if (cmd === '--version' || cmd === '-v') { console.log(`ghpub ${VERSION}`); return; }
+  if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h' || opts.help) { cmdHelp(); return; }
+
+  // api 传输模式不依赖本地 git 客户端
+  if (cmd === 'publish' && opts.transport !== 'api' && !process.env.GH_NO_GITCHECK) {
+    try { execFileSync('git', ['--version'], { stdio: 'ignore' }); }
+    catch { exit('未检测到 git，请先安装 Git: https://git-scm.com（或使用 --transport api）'); }
+  }
+
+  try {
+    if (cmd === 'login') await cmdLogin(opts);
+    else if (cmd === 'whoami') await cmdWhoami();
+    else if (cmd === 'publish') await cmdPublish(opts);
+    else { fail(`未知命令: ${cmd}`); cmdHelp(); process.exit(1); }
+  } catch (e) {
+    exit(e && e.message ? e.message : String(e));
+  }
+}
+
+main();
