@@ -1,0 +1,98 @@
+# .github/workflows/publish.yml
+# 作用：在 GitHub Actions 中用 ghpub 自动发布（创建 Release，并把 Skill 打包成 zip 作为附件）。
+# 触发器：推送 v* 标签，或手动 workflow_dispatch。
+# 使用方式：
+#   1) 把本文件复制到你的 Skill/项目仓库的 .github/workflows/publish.yml
+#   2) 把 ghpub 主程序放到仓库 .github/ghpub（推荐，内网/私有仓库无需外网下载）
+#      或在仓库 Settings → Secrets and variables → Variables 设 GHPUB_URL 指向 raw 下载地址
+#   3) 打标签发布： git tag v1.0.0 && git push origin v1.0.0
+#   说明：GH_TOKEN 使用 Actions 内置 secrets.GITHUB_TOKEN，无需写配置文件。
+name: Publish to GitHub (ghpub)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      changelog:
+        description: '变更说明（不填则用标签名）'
+        required: false
+        default: ''
+
+# 创建 Release / 推送 tag 需要 contents: write
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 需要完整历史以处理 tag
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: 安装 ghpub
+        env:
+          GHPUB_URL: ${{ vars.GHPUB_URL }}
+        run: |
+          # 优先使用仓库内自带的 ghpub（建议放 .github/ghpub）
+          if [ -f .github/ghpub ]; then
+            install -m 755 .github/ghpub /usr/local/bin/ghpub
+            echo "已使用仓库内 .github/ghpub"
+          elif [ -n "${GHPUB_URL}" ]; then
+            curl -fsSL "${GHPUB_URL}" -o /usr/local/bin/ghpub && chmod +x /usr/local/bin/ghpub
+            echo "已从 GHPUB_URL 下载 ghpub"
+          else
+            echo "未找到 .github/ghpub，也未设置变量 GHPUB_URL；请二选一" && exit 1
+          fi
+          ghpub --version
+
+      - name: 打包 Skill zip（作为 Release 附件）
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # 包内顶层目录名，默认用仓库名
+          PKGDIR="${GITHUB_REPOSITORY##*/}"
+          PKG="${PKGDIR}_v${VERSION}.zip"
+
+          # 产出到 RUNNER_TEMP（仓库目录之外），避免被 git 提交进仓库
+          OUT="${RUNNER_TEMP}/pkg"
+          STAGE="${RUNNER_TEMP}/stage"
+          rm -rf "$OUT" "$STAGE"
+          mkdir -p "$OUT" "$STAGE/$PKGDIR"
+
+          # 只打包 Skill 内容，排除仓库级/CI 文件与生成产物
+          for item in LICENSE README.md SKILL.md CHANGELOG.md manifest.json scripts; do
+            if [ -e "$item" ]; then cp -R "$item" "$STAGE/$PKGDIR/"; fi
+          done
+          find "$STAGE" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+          find "$STAGE" -name '*.pyc' -delete 2>/dev/null || true
+
+          ( cd "$STAGE" && zip -r -q "$OUT/$PKG" "$PKGDIR" )
+          echo "已生成附件: $PKG ($(du -h "$OUT/$PKG" | cut -f1))"
+          echo "PKG=$OUT/$PKG" >> "$GITHUB_ENV"
+
+      - name: 发布（建仓/推送/Release + 附件）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # ghpub 的 git 模式在检测到变更时会 commit，CI runner 需先配置 git 身份
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 版本号取自标签名（去掉前缀 v）；changelog 优先级：手动输入 > 标签名 > 默认
+          VERSION="${GITHUB_REF_NAME#v}"
+          CHANGELOG="${{ github.event.inputs.changelog }}"
+          if [ -z "${CHANGELOG}" ]; then
+            CHANGELOG="${GITHUB_REF_NAME}"
+          fi
+          if [ -z "${CHANGELOG}" ]; then
+            CHANGELOG="自动发布"
+          fi
+          ghpub publish . --release --version "${VERSION}" --changelog "${CHANGELOG}" --asset "${PKG}"
