@@ -1,0 +1,2 @@
+﻿id,work_id,blogger_id,content,likes,created_at,replied,sentiment,source
+EXAMPLE-C001,EXAMPLE-W001,EXAMPLE-001,性价比很高，已回购,12,2026-11-01T21:02,0,0.5,authorized_export
