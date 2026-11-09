@@ -67,10 +67,17 @@ jobs:
           rm -rf "$OUT" "$STAGE"
           mkdir -p "$OUT" "$STAGE/$PKGDIR"
 
-          # 只打包 Skill 内容，排除仓库级/CI 文件与生成产物
-          for item in LICENSE README.md SKILL.md CHANGELOG.md manifest.json scripts; do
-            if [ -e "$item" ]; then cp -R "$item" "$STAGE/$PKGDIR/"; fi
-          done
+          # 通用排除式打包：除仓库级/CI 文件与产物外，其余内容全部纳入包内
+          # （避免固定白名单漏掉 references/、assets/ 等技能目录）
+          if command -v tar >/dev/null 2>&1; then
+            tar -cf - \
+              --exclude='./.git' --exclude='./.github' --exclude='./.gitignore' \
+              --exclude='__pycache__' --exclude='*.pyc' --exclude='./*.zip' \
+              --exclude='./out' --exclude='./node_modules' \
+              . | ( cd "$STAGE/$PKGDIR" && tar -xf - )
+          else
+            echo "未找到 tar，无法打包" && exit 1
+          fi
           find "$STAGE" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
           find "$STAGE" -name '*.pyc' -delete 2>/dev/null || true
 
