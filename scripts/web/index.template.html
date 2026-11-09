@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>主播数据洞察中心 · Vibe Streamer Analytics</title>
+<style>
+:root{--r:14px;--sp:18px;--font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif}
+:root[data-theme="light"]{
+  --bg:#f4f6fb;--surface:#fff;--surface2:#f8f9fe;--line:#e6e9f2;--line2:#eef0f7;
+  --text:#171c31;--muted:#727c96;--faint:#9aa3ba;
+  --primary:#5b5bed;--primary2:#8a7bfa;--primary-soft:#eef0ff;
+  --cyan:#0aa695;--cyan-soft:#e2f7f3;--pink:#e2578b;--pink-soft:#fdeaf2;
+  --amber:#d99321;--amber-soft:#fdf3e0;--red:#dc5749;--red-soft:#fdeceb;
+  --green:#159c6b;--green-soft:#e4f6ee;
+  --shadow:0 1px 2px rgba(20,28,70,.04),0 10px 34px rgba(20,28,70,.055);
+  --grid:rgba(20,28,70,.07);
+}
+:root[data-theme="dark"]{
+  --bg:#090e1c;--surface:#111a2d;--surface2:#162137;--line:#22304c;--line2:#1b2740;
+  --text:#e9edfb;--muted:#98a5c2;--faint:#6f7d9c;
+  --primary:#8b93ff;--primary2:#b39cff;--primary-soft:#212a52;
+  --cyan:#35d6bd;--cyan-soft:#123b3a;--pink:#ff7fb0;--pink-soft:#42203a;
+  --amber:#f0b95a;--amber-soft:#3d3118;--red:#ff7a6b;--red-soft:#422021;
+  --green:#4bd39c;--green-soft:#123c31;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 36px rgba(0,0,0,.28);
+  --grid:rgba(200,215,255,.09);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(900px 420px at 12% -8%,color-mix(in srgb,var(--primary) 9%,transparent),transparent 70%),
+             radial-gradient(760px 400px at 92% 2%,color-mix(in srgb,var(--cyan) 8%,transparent),transparent 70%)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+
+/* ---------- 顶栏 ---------- */
+.topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:18px;
+  padding:12px 26px;background:color-mix(in srgb,var(--surface) 88%,transparent);
+  backdrop-filter:blur(18px) saturate(150%);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:11px;min-width:250px}
+.logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:16px;
+  background:linear-gradient(135deg,var(--primary),var(--pink));box-shadow:0 6px 18px color-mix(in srgb,var(--primary) 35%,transparent)}
+.brand b{font-size:15px;letter-spacing:.2px;display:block;line-height:1.25}
+.brand span{font-size:10.5px;color:var(--faint);letter-spacing:1.3px;text-transform:uppercase}
+.topbar .spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:11.5px;font-weight:600;
+  border:1px solid var(--line);background:var(--surface2);color:var(--muted);white-space:nowrap}
+.pill.demo{background:var(--amber-soft);color:var(--amber);border-color:color-mix(in srgb,var(--amber) 28%,transparent)}
+.pill.live{background:var(--green-soft);color:var(--green);border-color:color-mix(in srgb,var(--green) 25%,transparent)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 18%,transparent)}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:9px;border:1px solid var(--line);
+  background:var(--surface);font-size:12.5px;font-weight:600;transition:.18s ease}
+.btn:hover{transform:translateY(-1px);border-color:var(--primary);box-shadow:var(--shadow)}
+.btn.primary{background:var(--primary);color:#fff;border-color:transparent}
+.btn.primary:hover{background:var(--primary2)}
+.kbd{font-size:10px;padding:1px 5px;border:1px solid var(--line);border-radius:4px;color:var(--faint);background:var(--surface2)}
+
+/* ---------- 骨架 ---------- */
+.shell{position:relative;z-index:1;display:grid;grid-template-columns:212px minmax(0,1fr);gap:26px;max-width:1680px;margin:0 auto;padding:24px 26px 80px}
+.side{position:sticky;top:76px;align-self:start;display:flex;flex-direction:column;gap:8px}
+.side .grp{font-size:10px;letter-spacing:1.6px;color:var(--faint);text-transform:uppercase;padding:12px 12px 4px;font-weight:700}
+.nav{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;color:var(--muted);font-size:13px;font-weight:600;transition:.16s;border:1px solid transparent}
+.nav i{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;font-style:normal;font-size:10px;font-weight:800;background:var(--surface2);color:var(--faint)}
+.nav:hover{background:var(--surface);color:var(--text)}
+.nav.on{background:var(--primary-soft);color:var(--primary);border-color:color-mix(in srgb,var(--primary) 20%,transparent)}
+.nav.on i{background:var(--primary);color:#fff}
+.sidecard{margin-top:14px;padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+.sidecard h4{margin:0 0 10px;font-size:11px;letter-spacing:1px;color:var(--faint);text-transform:uppercase}
+.leg{display:flex;gap:8px;align-items:flex-start;margin:8px 0;font-size:11.5px;color:var(--muted);line-height:1.45}
+.leg b{font-size:10px;padding:1px 6px;border-radius:5px;flex:none;margin-top:1px}
+.lv-observed{background:var(--cyan-soft);color:var(--cyan)}.lv-derived{background:var(--primary-soft);color:var(--primary)}.lv-estimated{background:var(--amber-soft);color:var(--amber)}
+
+main{min-width:0;display:flex;flex-direction:column;gap:38px}
+.section{scroll-margin-top:86px}
+.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.eyebrow{font-size:10.5px;letter-spacing:2px;font-weight:800;color:var(--primary);text-transform:uppercase}
+.sec-head h2{margin:3px 0 3px;font-size:24px;letter-spacing:-.5px;font-weight:800}
+.sec-head p{margin:0;color:var(--muted);font-size:12.5px;max-width:720px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:18px;min-width:0}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.card-h h3{margin:0;font-size:14px;font-weight:750;letter-spacing:.1px}
+.card-h .sub{font-size:11px;color:var(--faint)}
+.grid-2{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.grid-2eq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.stack{display:flex;flex-direction:column;gap:16px}
+
+/* ---------- KPI ---------- */
+.kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:13px}
+.kpi{position:relative;overflow:hidden;min-height:126px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:15px 15px 12px;box-shadow:var(--shadow);transition:.2s}
+.kpi:hover{transform:translateY(-3px);box-shadow:0 14px 36px color-mix(in srgb,var(--primary) 14%,transparent)}
+.kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(var(--primary),var(--cyan));opacity:.8}
+.kpi .lab{font-size:11.5px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
+.kpi .val{font-size:25px;font-weight:800;letter-spacing:-.8px;margin:7px 0 2px;line-height:1.15}
+.kpi .unit{font-size:12px;color:var(--muted);font-weight:600;margin-left:3px}
+.kpi .sub{font-size:10.5px;color:var(--faint);min-height:16px}
+.kpi .spark{height:30px;margin-top:6px}
+.badge{display:inline-block;font-size:9.5px;font-weight:750;letter-spacing:.4px;padding:2px 6px;border-radius:5px;text-transform:uppercase;vertical-align:middle}
+
+/* ---------- 图表通用 ---------- */
+.chart{width:100%;overflow:hidden}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{font-family:var(--font)}
+.axis{stroke:var(--grid);stroke-width:1}
+.axlbl{fill:var(--faint);font-size:10.5px}
+.glbl{fill:var(--muted);font-size:11px}
+.hit{fill:transparent;cursor:crosshair}
+.hbar-row{display:grid;grid-template-columns:78px minmax(0,1fr) 96px;align-items:center;gap:10px;margin:9px 0;font-size:12px}
+.hbar-track{height:9px;border-radius:9px;background:var(--line2);overflow:hidden}
+.hbar-fill{height:100%;border-radius:9px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.hbar-val{text-align:right;font-weight:700;font-size:12px}
+.hbar-sub{font-size:10px;color:var(--faint)}
+.donut-wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.legend{flex:1;min-width:130px;display:flex;flex-direction:column;gap:9px}
+.legend .li{display:flex;align-items:center;gap:8px;font-size:12px}
+.legend .sw{width:9px;height:9px;border-radius:3px;flex:none}
+.legend .li b{margin-left:auto;font-variant-numeric:tabular-nums}
+
+.tabs{display:inline-flex;gap:3px;padding:3px;background:var(--surface2);border:1px solid var(--line);border-radius:9px}
+.tab{padding:5px 12px;border:0;background:transparent;border-radius:7px;font-size:11.5px;font-weight:650;color:var(--muted);transition:.15s}
+.tab.on{background:var(--surface);color:var(--primary);box-shadow:0 1px 5px rgba(0,0,0,.07)}
+select,input[type=search]{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);font-size:12px;outline:none}
+select:focus,input:focus{border-color:var(--primary)}
+.ranklist{display:flex;flex-direction:column;gap:2px}
+.rank{display:grid;grid-template-columns:26px minmax(0,1fr) auto;align-items:center;gap:11px;padding:8px 10px;border-radius:9px;transition:.15s}
+.rank:hover{background:var(--surface2)}
+.rank .no{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:10.5px;font-weight:800;background:var(--surface2);color:var(--faint)}
+.rank:nth-child(-n+3) .no{background:var(--primary-soft);color:var(--primary)}
+.rank .nm{font-weight:650;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank .meta{font-size:10.5px;color:var(--faint)}
+.rank .v{font-weight:750;font-size:12.5px;font-variant-numeric:tabular-nums}
+.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-size:10.5px;letter-spacing:.5px;color:var(--faint);font-weight:700;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;user-select:none}
+th.sortable{cursor:pointer}th.sortable:hover{color:var(--primary)}
+td{padding:9px 10px;border-bottom:1px solid var(--line2);white-space:nowrap}
+tbody tr:hover{background:var(--surface2)}
+.tbl-scroll{overflow:auto;max-height:460px;border-radius:9px}
+.chip{display:inline-block;padding:2px 7px;border-radius:6px;background:var(--surface2);color:var(--muted);font-size:10.5px;font-weight:600}
+.chip.dy{background:var(--pink-soft);color:var(--pink)}.chip.xhs{background:var(--red-soft);color:var(--red)}
+.bar-mini{display:inline-block;vertical-align:middle;width:56px;height:5px;border-radius:5px;background:var(--line2);margin-right:7px;overflow:hidden}
+.bar-mini i{display:block;height:100%;background:var(--primary);border-radius:5px}
+
+.cloud{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:6px 0}
+.cloud span{padding:3px 9px;border-radius:8px;line-height:1.35;font-weight:700;transition:.18s;cursor:default}
+.cloud span:hover{transform:scale(1.09)}
+.metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.metric-box{padding:11px;border-radius:10px;background:var(--surface2);border:1px solid var(--line2)}
+.metric-box b{display:block;font-size:19px;letter-spacing:-.4px}
+.metric-box span{font-size:10.5px;color:var(--muted)}
+.list{display:flex;flex-direction:column;gap:8px}
+.li-item{padding:10px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--line2);font-size:12px}
+.li-item .t{font-weight:700;margin-bottom:2px}
+.li-item .d{color:var(--muted);font-size:11px;line-height:1.5}
+
+.ins-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ins{padding:16px;border-radius:12px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);position:relative;overflow:hidden;transition:.2s}
+.ins:hover{transform:translateY(-2px)}
+.ins:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--primary)}
+.ins.risk:before{background:var(--red)}.ins.opportunity:before{background:var(--green)}.ins.info:before{background:var(--cyan)}
+.ins .tag{font-size:10px;font-weight:750;letter-spacing:.6px;color:var(--faint)}
+.ins h4{margin:5px 0 7px;font-size:14px}
+.ins p{margin:0 0 9px;font-size:12px;color:var(--muted);line-height:1.65}
+.ins .ev{font-size:10.5px;color:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface2);padding:4px 8px;border-radius:6px;display:inline-block}
+
+.heat-cell{transition:.15s}.heat-cell:hover{stroke:var(--text);stroke-width:1.5}
+.note{font-size:11px;color:var(--faint);margin-top:10px;line-height:1.55}
+.warnbar{display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:11px;background:var(--amber-soft);color:var(--amber);font-size:12px;font-weight:600;border:1px solid color-mix(in srgb,var(--amber) 25%,transparent)}
+.infobar{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:11px;background:var(--primary-soft);color:var(--primary);font-size:12px;line-height:1.6;border:1px solid color-mix(in srgb,var(--primary) 18%,transparent)}
+.infobar b{font-weight:750}
+.empty{display:grid;place-items:center;min-height:76px;color:var(--faint);font-size:12px;background:var(--surface2);border:1px dashed var(--line);border-radius:10px}
+
+/* ---------- 抽屉 / tooltip ---------- */
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,92vw);background:var(--surface);border-left:1px solid var(--line);
+  box-shadow:-20px 0 60px rgba(0,0,0,.16);z-index:80;transform:translateX(102%);transition:transform .28s cubic-bezier(.2,.8,.2,1);overflow:auto;padding:26px}
+#drawer.open{transform:none}
+#mask{position:fixed;inset:0;background:rgba(8,12,30,.42);z-index:70;opacity:0;pointer-events:none;transition:.25s}
+#mask.on{opacity:1;pointer-events:auto}
+.drawer-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.drawer-h h2{margin:0;font-size:19px}
+#tip{position:fixed;z-index:120;pointer-events:none;opacity:0;transition:opacity .12s;background:var(--text);color:var(--surface);
+  padding:7px 10px;border-radius:8px;font-size:11.5px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2);white-space:pre-line;max-width:260px}
+#tip.on{opacity:1}
+.foot{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);color:var(--faint);font-size:11px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+@media(max-width:1300px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.grid-3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:1020px){.shell{grid-template-columns:1fr;padding:18px}.side{position:static;flex-direction:row;overflow:auto;gap:6px}
+ .side .grp,.sidecard{display:none}.nav{white-space:nowrap}.grid-2,.grid-2eq,.ins-grid{grid-template-columns:1fr}}
+@media(max-width:640px){.kpi-grid,.grid-3{grid-template-columns:repeat(2,1fr)}.topbar{padding:10px 14px;gap:10px}.brand{min-width:0}.brand span,.pill.hide-s{display:none}
+ .shell{padding:14px}.sec-head h2{font-size:20px}.hide-s{display:none}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">V</div>
+    <div><b>主播数据洞察中心</b><span>Streamer Intelligence</span></div>
+  </div>
+  <span id="srcPill" class="pill"></span>
+  <span id="timePill" class="pill hide-s"></span>
+  <div class="spacer"></div>
+  <button class="btn hide-s" id="btnSources">数据源配置</button>
+  <button class="btn hide-s" id="btnMethod">指标口径</button>
+  <button class="btn hide-s" id="btnCsv">导出博主 CSV</button>
+  <button class="btn primary" id="btnTheme">切换深色</button>
+</header>
+
+<div class="shell">
+  <aside class="side">
+    <div class="grp">分析导航</div>
+    <a class="nav on" href="#overview"><i>01</i>总览</a>
+    <a class="nav" href="#growth"><i>02</i>粉丝增长</a>
+    <a class="nav" href="#content"><i>03</i>作品内容</a>
+    <a class="nav" href="#audience"><i>04</i>评论口碑</a>
+    <a class="nav" href="#shop"><i>05</i>橱窗电商</a>
+    <a class="nav" href="#member"><i>06</i>会员体系</a>
+    <a class="nav" href="#monetize"><i>07</i>变现评估</a>
+    <a class="nav" href="#table"><i>08</i>博主明细</a>
+    <a class="nav" href="#insights"><i>09</i>AI 洞察</a>
+    <a class="nav" href="#sources"><i>10</i>数据源配置</a>
+    <div class="sidecard">
+      <h4>数据可信度</h4>
+      <div class="leg"><b class="lv-observed">实测</b><span>授权接口 / 自有导出字段</span></div>
+      <div class="leg"><b class="lv-derived">派生</b><span>实测字段按固定公式计算</span></div>
+      <div class="leg"><b class="lv-estimated">估算</b><span>代理指标推断，仅供横向比较</span></div>
+      <div class="note">所有估算值均已标注，不作为事实引用。点右上角「指标口径」查看公式。</div>
+    </div>
+    <div class="sidecard">
+      <h4>快捷键</h4>
+      <div class="leg"><span class="kbd">1</span> – <span class="kbd">9</span> &nbsp;切换章节</div>
+      <div class="leg"><span class="kbd">⌘/Ctrl</span> + <span class="kbd">K</span> &nbsp;搜索博主</div>
+      <div class="leg"><span class="kbd">T</span> &nbsp;切换主题</div>
+    </div>
+  </aside>
+
+  <main>
+    <div id="demoWarn"></div>
+
+    <!-- 01 总览 -->
+    <section class="section" id="overview">
+      <div class="sec-head">
+        <div><div class="eyebrow">01 / Overview</div><h2>总览</h2>
+          <p>一次看清监控盘子的规模、行业结构与头部榜单。所有比率采用 P5/P95 缩尾后中位数，避免单条爆款扭曲结论。</p></div>
+        <div class="tabs" id="rankTabs"></div>
+      </div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="grid-2" style="margin-top:16px">
+        <div class="card">
+          <div class="card-h"><h3>行业粉丝规模 · 变现效率</h3><span class="badge lv-derived">派生</span></div>
+          <div id="industryChart"></div>
+          <div class="note">条形长度 = 行业合计粉丝；右侧数字 = 该行业中位互动率 / 变现综合评分。</div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-h"><h3>粉丝量级结构</h3><span class="badge lv-observed">实测</span></div>
+            <div class="donut-wrap"><div id="tierDonut" style="width:150px;flex:none"></div><div class="legend" id="tierLegend"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>平台分布</h3></div>
+            <div id="platformBox"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-h"><h3 id="rankTitle">涨粉速率榜</h3><span class="sub" id="rankSub"></span></div>
+        <div class="ranklist" id="rankBody"></div>
+      </div>
+    </section>
+
+    <!-- 02 增长 -->
+    <section class="section" id="growth">
+      <div class="sec-head"><div><div class="eyebrow">02 / Growth</div><h2>粉丝量与增长</h2>
+        <p>31 日粉丝曲线、增速拐点与爆款涨粉转化效率。增长率以快照差值计算，不使用平台未开放的「粉丝来源」推断。</p></div>
+        <select id="growthSelect"></select></div>
+      <div class="card"><div class="card-h"><h3>粉丝规模趋势</h3><span class="badge lv-observed">实测</span></div><div id="growthChart" class="chart"></div>
+        <div class="note" id="growthNote"></div></div>
+      <div class="grid-2" style="margin-top:16px">
+        <div class="card"><div class="card-h"><h3>涨粉转化效率 TOP 10</h3><span class="badge lv-derived">派生</span></div>
+          <div id="convChart"></div><div class="note">每万次播放带来的 30 日净增粉丝，剔除播放量为 0 的样本。</div></div>
+        <div class="card"><div class="card-h"><h3>增速拐点</h3><span class="badge lv-derived">派生</span></div>
+          <div class="list" id="inflectList"></div>
+          <div class="note">按全平台日净增绝对值排序；拐点仅提示「值得回看当天作品」，不构成原因判断。</div></div>
+      </div>
+    </section>
+
+    <!-- 03 作品 -->
+    <section class="section" id="content">
+      <div class="sec-head"><div><div class="eyebrow">03 / Content</div><h2>作品分类与内容分析</h2>
+        <p>发布规律、时段效率、爆款共性。互动率为「赞+评+分享 / 播放量」；完播率无合规对外接口，本系统不做臆测。</p></div></div>
+      <div class="card"><div class="card-h"><h3>24 小时发布密度与互动效率</h3><span class="badge lv-derived">派生</span></div><div id="hourChart" class="chart"></div>
+        <div class="note">柱 = 作品数（左轴）；折线 = 该时段平均互动率（右轴）。仅展示样本量 ≥ 10 的时段用于效率判断。</div></div>
+      <div class="card" style="margin-top:16px"><div class="card-h"><h3>发布热力 · 星期 × 小时</h3><span class="badge lv-observed">实测</span></div><div id="heatChart" class="chart"></div></div>
+      <div class="grid-3" style="margin-top:16px">
+        <div class="card"><div class="card-h"><h3>时长分段</h3></div><div id="durBox"></div></div>
+        <div class="card"><div class="card-h"><h3>封面类型表现</h3></div><div id="coverBox"></div></div>
+        <div class="card"><div class="card-h"><h3>内容标签分布</h3></div><div id="tagBox"></div></div>
+      </div>
+      <div class="card" style="margin-top:16px"><div class="card-h"><h3>Top 10% 高互动作品共性</h3><span class="badge lv-derived">派生</span></div>
+        <div class="grid-2eq"><div id="viralBox"></div><div class="list" id="viralList"></div></div></div>
+    </section>
+
+    <!-- 04 评论 -->
+    <section class="section" id="audience">
+      <div class="sec-head"><div><div class="eyebrow">04 / Sentiment</div><h2>评论深度挖掘</h2>
+        <p>领域词典 + 否定/程度规则的情感判别，热词、有效评论率与争议点识别。语料口径与局限见「指标口径」。</p></div></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-h"><h3>情感倾向分布</h3><span class="badge lv-estimated">估算</span></div>
+          <div class="donut-wrap"><div id="sentDonut" style="width:170px;flex:none"></div><div class="legend" id="sentLegend"></div></div>
+          <div class="metric-row" id="sentMetrics"></div></div>
+        <div class="card"><div class="card-h"><h3>高频话题词</h3><span class="badge lv-derived">派生</span></div>
+          <div class="cloud" id="cloud"></div>
+          <div class="note">字号按词频，颜色按该词上下文平均情感分（青=正面 / 红=负面 / 灰=中性）。识别引擎：<span id="nlpEngine"></span></div></div>
+      </div>
+      <div class="card" style="margin-top:16px"><div class="card-h"><h3>集中负面讨论的作品</h3><span class="badge lv-estimated">估算</span></div><div class="list" id="controList"></div>
+        <div class="note">仅列出同一作品下负面评论 ≥ 2 条的样本，用于人工复核，不自动判定为舆情事件。</div></div>
+    </section>
+
+    <!-- 05 橱窗 -->
+    <section class="section" id="shop">
+      <div class="sec-head"><div><div class="eyebrow">05 / Commerce</div><h2>橱窗电商分析</h2>
+        <p>品类结构、价格带与估算 GMV。平台销量标识为区间展示值，未扣除退款/佣金，因此所有金额只支持同批次排序。</p></div></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-h"><h3>品类 GMV 估算</h3><span class="badge lv-estimated">估算</span></div><div id="catChart"></div></div>
+        <div class="card"><div class="card-h"><h3>价格带分布</h3><span class="badge lv-observed">实测</span></div><div id="priceBox"></div>
+          <div class="card-h" style="margin-top:20px"><h3>行业 GMV 对比</h3></div><div id="gmvIndBox"></div></div>
+      </div>
+      <div class="card" style="margin-top:16px"><div class="card-h"><h3>估算 GMV 最高商品</h3><span class="badge lv-estimated">估算</span></div><div class="tbl-scroll" id="prodTable"></div></div>
+    </section>
+
+    <!-- 06 会员 -->
+    <section class="section" id="member">
+      <div class="sec-head"><div><div class="eyebrow">06 / Membership</div><h2>会员体系分析</h2>
+        <p>定价策略、开通覆盖与入会转化近似。会员明细需达人后台授权导出，开放平台 OAuth 不提供。</p></div></div>
+      <div class="grid-3">
+        <div class="card"><div class="card-h"><h3>月费定价分布</h3></div><div id="memberPrice"></div></div>
+        <div class="card"><div class="card-h"><h3>平台会员覆盖</h3></div><div id="memberPlat"></div></div>
+        <div class="card"><div class="card-h"><h3>会员内容更新</h3></div><div id="memberFreq"></div></div>
+      </div>
+      <div class="card" style="margin-top:16px"><div class="card-h"><h3>入会转化近似 TOP 10</h3><span class="badge lv-estimated">估算</span></div>
+        <div id="penetrationBox"></div><div class="note">会员数 / 当前粉丝数，属静态近似，不等于真实入会转化率。</div></div>
+    </section>
+
+    <!-- 07 变现 -->
+    <section class="section" id="monetize">
+      <div class="sec-head"><div><div class="eyebrow">07 / Monetization</div><h2>变现能力综合评估</h2>
+        <p>广告价值 40% / 带货潜力 35% / 会员收入 25% 的加权排序型评分。用于同批次对标，不是收入预测。</p></div></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-h"><h3>能力雷达 · TOP10 vs 全样本</h3><span class="badge lv-estimated">估算</span></div><div id="radarChart" class="chart"></div></div>
+        <div class="card"><div class="card-h"><h3>行业变现效率</h3></div><div id="monetInd"></div></div>
+      </div>
+      <div class="card" style="margin-top:16px"><div class="card-h"><h3>变现综合评分 TOP 10</h3></div><div class="tbl-scroll" id="monetTable"></div></div>
+    </section>
+
+    <!-- 08 明细 -->
+    <section class="section" id="table">
+      <div class="sec-head"><div><div class="eyebrow">08 / Roster</div><h2>博主明细</h2>
+        <p>点击表头排序，支持行业 / 平台 / 量级筛选与关键词搜索；可导出当前筛选结果的 CSV。</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="search" id="q" placeholder="搜索昵称 / 行业…  ⌘K" style="width:200px">
+          <select id="fInd"></select><select id="fPlat"></select><select id="fTier"></select>
+        </div></div>
+      <div class="card"><div class="card-h"><h3 id="tblCount"></h3><button class="btn" id="btnExportView">导出当前视图</button></div>
+        <div class="tbl-scroll" id="bloggerTable"></div></div>
+    </section>
+
+    <!-- 09 洞察 -->
+    <section class="section" id="insights">
+      <div class="sec-head"><div><div class="eyebrow">09 / Insights</div><h2>规则化洞察</h2>
+        <p>每条结论都附带可核对的证据数字，无 LLM 也能生成；接入大模型时仅做润色，事实仍以本页数字为准。</p></div>
+        <div class="tabs" id="insTabs"></div></div>
+      <div class="ins-grid" id="insGrid"></div>
+    </section>
+
+    <!-- 10 数据源配置 -->
+    <section class="section" id="sources">
+      <div class="sec-head">
+        <div><div class="eyebrow">10 / Data Sources</div><h2>数据源接口配置</h2>
+          <p>集中管理接入方式、采集白名单与接口凭证。配置保存在本机浏览器（localStorage），可导入/导出 JSON 后回命令行执行采集。本页为纯离线静态页，不直接调用任何平台接口。</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="srcImportBtn">导入配置</button>
+          <button class="btn primary" id="srcExport">导出配置</button>
+          <input type="file" id="srcImport" accept=".json,application/json" hidden>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-h"><h3>当前接入状态</h3><span id="srcStatusBadge"></span></div>
+          <div id="srcStatus"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>可用接入方式</h3><span class="sub">5 种合规通道</span></div>
+          <div id="srcChannels" class="list"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-h"><h3>采集账号白名单</h3>
+          <span class="sub">仅这些账号会被公开页采集 · 竞品须填确认人</span>
+          <button class="btn primary" id="srcAddOwn">+ 自有账号</button>
+          <button class="btn" id="srcAddRisk">+ 竞品账号</button></div>
+        <div class="tbl-scroll" id="srcWhite"></div>
+        <div class="note">白名单为本地配置，不随看板分发；竞品采集的正当竞争风险由操作者自担，务必填写 ack_by / ack_at。</div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-h"><h3>接口凭证</h3><span class="sub">仅存本机，请勿提交版本库</span></div>
+        <div class="grid-2eq" id="srcCred"></div>
+        <div class="note">OAuth 用于抖音/小红书官方授权（需企业资质 + 授权 code）；第三方 DAAS 为蝉妈妈/千瓜/新榜企业 API key。导出为 config.json 片段后置于项目目录。</div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-h"><h3>下一步 · 回命令行执行</h3><span class="sub">按当前配置自动生成</span></div>
+        <div id="srcCommands" class="list"></div>
+      </div>
+    </section>
+
+    <div class="foot"><span>Vibe Streamer Analytics v<span id="ver"></span> · 单文件离线看板 · 无外部依赖</span>
+      <span id="footMeta"></span></div>
+  </main>
+</div>
+
+<div id="mask"></div>
+<aside id="drawer">
+  <div class="drawer-h"><h2>指标口径与数据边界</h2><button class="btn" id="btnCloseDrawer">关闭</button></div>
+  <div id="methodBody"></div>
+</aside>
+<div id="tip"></div>
+
+<script>
+/*__PAYLOAD__*/
+
+/* ============ 基础工具 ============ */
+const R = REPORT;
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const C = {
+  primary:'var(--primary)', cyan:'var(--cyan)', pink:'var(--pink)', amber:'var(--amber)',
+  red:'var(--red)', green:'var(--green)', muted:'var(--muted)', faint:'var(--faint)',
+  line:'var(--line)', surface2:'var(--surface2)', grid:'var(--grid)', text:'var(--text)'
+};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nf = n => (typeof n === 'number' ? n : Number(n||0)).toLocaleString('zh-CN',{maximumFractionDigits:1});
+const nf0 = n => Math.round(Number(n||0)).toLocaleString('zh-CN');
+const wan = n => {const v=Number(n||0);return v>=1e8?(v/1e8).toFixed(2)+' 亿':(v>=1e4?(v/1e4).toFixed(1)+' 万':nf0(v))};
+const money = n => '¥' + wan(n);
+const badge = lv => `<span class="badge lv-${lv}">${({observed:'实测',derived:'派生',estimated:'估算'})[lv]||lv}</span>`;
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+function svg(w,h,inner,extra=''){return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" ${extra}>${inner}</svg>`}
+function color(i){const p=[C.primary,C.cyan,C.pink,C.amber,C.green,'#9b7bf7','#4aa8e0','#e07b52'];return p[i%p.length]}
+function tipText(el,t){el.setAttribute('data-tip',t)}
+function fmtNum(v,unit=''){return nf(v)+unit}
+
+/* ============ 图表原语 ============ */
+function sparkline(vals,w=180,h=30){
+  if(!vals||vals.length<2)return '';
+  const min=Math.min(...vals),max=Math.max(...vals),span=max-min||1;
+  const pts=vals.map((v,i)=>[i/(vals.length-1)*w, h-3-(v-min)/span*(h-8)]);
+  const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const id='g'+Math.random().toString(36).slice(2,8);
+  return svg(w,h,`<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="${C.primary}" stop-opacity=".28"/><stop offset="100%" stop-color="${C.primary}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${d} L ${w} ${h} L 0 ${h} Z" fill="url(#${id})"/>
+    <path d="${d}" fill="none" stroke="${C.primary}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${pts.at(-1)[0]}" cy="${pts.at(-1)[1]}" r="2.6" fill="${C.primary}"/>`);
+}
+function hbars(el,data,opt={}){
+  if(!data||!data.length){el.innerHTML='<div class="empty">暂无该维度数据 · 导入对应台账后自动填充</div>';return}
+  const max=Math.max(...data.map(d=>d.value),1);
+  el.innerHTML=data.map((d,i)=>`<div class="hbar-row" data-tip="${esc(d.tip||d.name+'：'+nf(d.value))}">
+    <div style="color:var(--muted);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.name)}</div>
+    <div class="hbar-track"><div class="hbar-fill" style="width:${(d.value/max*100).toFixed(1)}%;background:${d.color||color(i)}"></div></div>
+    <div class="hbar-val num">${esc(d.label||nf(d.value))}${d.sub?`<div class="hbar-sub">${esc(d.sub)}</div>`:''}</div></div>`).join('');
+}
+function donut(el,segs,opt={}){
+  if(!segs||!segs.length||!segs.some(s=>s.value>0)){el.innerHTML='<div class="empty">暂无数据</div>';return}
+  const size=opt.size||160,r=size/2-14,cx=size/2,cy=size/2,sw=opt.sw||17;
+  const total=segs.reduce((a,b)=>a+b.value,0)||1,circ=2*Math.PI*r;
+  let acc=0;
+  const rings=segs.map((s,i)=>{
+    const frac=s.value/total, dash=`${(frac*circ).toFixed(2)} ${circ.toFixed(2)}`;
+    const off=(-acc*circ).toFixed(2); acc+=frac;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${sw}"
+      stroke-dasharray="${dash}" stroke-dashoffset="${off}" transform="rotate(-90 ${cx} ${cy})"
+      data-tip="${esc(s.name+'：'+nf0(s.value)+'（'+(frac*100).toFixed(1)+'%）')}" style="cursor:pointer"/>`;
+  }).join('');
+  el.innerHTML=svg(size,size,`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${C.surface2}" stroke-width="${sw}"/>${rings}
+    <text x="${cx}" y="${cy-2}" text-anchor="middle" style="font-size:19px;font-weight:800;fill:${C.text}">${esc(opt.center||nf0(total))}</text>
+    <text x="${cx}" y="${cy+15}" text-anchor="middle" style="font-size:10px;fill:${C.muted}">${esc(opt.label||'合计')}</text>`);
+}
+function legend(el,segs){
+  const total=segs.reduce((a,b)=>a+b.value,0)||1;
+  el.innerHTML=segs.map(s=>`<div class="li"><i class="sw" style="background:${s.color}"></i>
+    <span>${esc(s.name)}</span><b>${nf0(s.value)} <span style="color:var(--faint);font-weight:500">${(s.value/total*100).toFixed(0)}%</span></b></div>`).join('');
+}
+function lineChart(el,series,opt={}){
+  const w=820,h=opt.h||270,p={l:64,r:56,t:18,b:30};
+  const all=series.flatMap(s=>s.points.map(x=>x.value));
+  if(!all.length){el.innerHTML='<div class="note">无可用序列</div>';return}
+  let min=Math.min(...all),max=Math.max(...all);
+  const pad=(max-min)*0.12||max*0.1||1; min=Math.max(0,min-pad); max=max+pad;
+  const n=Math.max(...series.map(s=>s.points.length));
+  const X=i=>p.l+i/(n-1||1)*(w-p.l-p.r), Y=v=>p.t+(1-(v-min)/(max-min||1))*(h-p.t-p.b);
+  let g='';
+  for(let k=0;k<=4;k++){
+    const y=p.t+k/4*(h-p.t-p.b), v=max-k/4*(max-min);
+    g+=`<line class="axis" x1="${p.l}" y1="${y}" x2="${w-p.r}" y2="${y}" stroke-dasharray="${k===4?'0':'3 5'}"/>
+        <text class="axlbl" x="${p.l-8}" y="${y+3.5}" text-anchor="end">${wan(v)}</text>`;
+  }
+  const labels=series[0].points;
+  const step=Math.max(1,Math.floor(n/6));
+  for(let i=0;i<n;i+=step){
+    g+=`<text class="axlbl" x="${X(i)}" y="${h-8}" text-anchor="middle">${esc((labels[i].date||labels[i].label||'').slice(5))}</text>`;
+  }
+  const gid='area'+Math.random().toString(36).slice(2,7);
+  let body='';
+  series.forEach((s,si)=>{
+    const d=s.points.map((pt,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(pt.value).toFixed(1)).join(' ');
+    if(si===0){
+      body+=`<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${s.color}" stop-opacity=".22"/><stop offset="100%" stop-color="${s.color}" stop-opacity="0"/></linearGradient></defs>
+        <path d="${d} L ${X(s.points.length-1)} ${h-p.b} L ${p.l} ${h-p.b} Z" fill="url(#${gid})"/>`;
+    }
+    body+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${si===0?2.6:1.7}" stroke-linejoin="round" stroke-linecap="round" ${si?'stroke-dasharray="5 4"':''}/>`;
+    s.points.forEach((pt,i)=>{
+      body+=`<circle cx="${X(i)}" cy="${Y(pt.value)}" r="9" class="hit" data-tip="${esc((pt.date||'')+'\n'+s.name+'：'+nf0(pt.value))}"/>`;
+      if(i===s.points.length-1)body+=`<circle cx="${X(i)}" cy="${Y(pt.value)}" r="3.6" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`;
+    });
+  });
+  let legendHtml=series.map((s,i)=>`<g transform="translate(${p.l+i*130},${p.t-4})"><rect width="9" height="9" rx="2" fill="${s.color}"/>
+    <text class="glbl" x="14" y="8">${esc(s.name)}</text></g>`).join('');
+  el.innerHTML=svg(w,h,g+body+legendHtml);
+}
+function comboChart(el,data){
+  if(!data||!data.length){el.innerHTML='<div class="empty">暂无作品数据</div>';return}
+  const w=820,h=270,p={l:52,r:56,t:22,b:30};
+  const maxC=Math.max(...data.map(d=>d.count),1),maxI=Math.max(...data.map(d=>d.ir),1);
+  const bw=(w-p.l-p.r)/data.length;
+  let g='';
+  for(let k=0;k<=4;k++){
+    const y=p.t+k/4*(h-p.t-p.b);
+    g+=`<line class="axis" x1="${p.l}" y1="${y}" x2="${w-p.r}" y2="${y}" stroke-dasharray="${k===4?'0':'3 5'}"/>
+      <text class="axlbl" x="${p.l-8}" y="${y+3.5}" text-anchor="end">${Math.round(maxC*(1-k/4))}</text>
+      <text class="axlbl" x="${w-p.r+8}" y="${y+3.5}" text-anchor="start">${(maxI*(1-k/4)).toFixed(1)}%</text>`;
+  }
+  let bars='',line='';
+  data.forEach((d,i)=>{
+    const x=p.l+i*bw+bw*0.18, bwid=bw*0.64, cy=p.t+(1-d.ir/maxI)*(h-p.t-p.b);
+    const bh=(d.count/maxC)*(h-p.t-p.b);
+    bars+=`<rect x="${x.toFixed(1)}" y="${(h-p.b-bh).toFixed(1)}" width="${bwid.toFixed(1)}" height="${Math.max(1,bh).toFixed(1)}" rx="3"
+      fill="${C.primary}" opacity="${0.28+0.55*d.count/maxC}" data-tip="${esc(d.hour+':00\n作品 '+d.count+' 条\n平均互动率 '+d.ir+'%')}"/>`;
+    if(i%3===0)g+=`<text class="axlbl" x="${(x+bwid/2).toFixed(1)}" y="${h-8}" text-anchor="middle">${d.hour}</text>`;
+    line+=(i?'L':'M')+(x+bwid/2).toFixed(1)+' '+cy.toFixed(1)+' ';
+  });
+  let dots=data.map((d,i)=>{
+    const x=p.l+i*bw+bw/2, y=p.t+(1-d.ir/maxI)*(h-p.t-p.b);
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.4" fill="${C.cyan}"/>`;
+  }).join('');
+  el.innerHTML=svg(w,h,g+bars+`<path d="${line}" fill="none" stroke="${C.cyan}" stroke-width="2.2" stroke-linejoin="round"/>`+dots+
+    `<text class="axlbl" x="${p.l}" y="12">作品数</text><text class="axlbl" x="${w-p.r}" y="12" text-anchor="end">互动率</text>`);
+}
+function heatmap(el,matrix){
+  if(!matrix||!matrix.length||!matrix.flat().some(v=>v>0)){el.innerHTML='<div class="empty">暂无发布热力数据</div>';return}
+  const w=820,cw=30,ch=22,p={l:42,t:22},gap=2;
+  const flat=matrix.flat(),max=Math.max(...flat,1);
+  const wd=['周一','周二','周三','周四','周五','周六','周日'];
+  let g='';
+  for(let h=0;h<24;h+=3)g+=`<text class="axlbl" x="${p.l+h*(cw+gap)+cw/2}" y="14" text-anchor="middle">${h}</text>`;
+  matrix.forEach((row,d)=>{
+    g+=`<text class="axlbl" x="${p.l-8}" y="${p.t+d*(ch+gap)+ch/2+3.5}" text-anchor="end">${wd[d]}</text>`;
+    row.forEach((v,h)=>{
+      const t=v/max, alpha=(0.12+0.88*t).toFixed(2);
+      g+=`<rect class="heat-cell" x="${p.l+h*(cw+gap)}" y="${p.t+d*(ch+gap)}" width="${cw}" height="${ch}" rx="3"
+        fill="${t>0.62?C.pink:C.primary}" opacity="${alpha}" data-tip="${esc(wd[d]+' '+h+':00\n发布 '+v+' 条作品')}"/>`;
+    });
+  });
+  el.innerHTML=svg(w,p.t+7*(ch+gap)+10,g);
+}
+function radar(el,axes,series){
+  if(!axes||!axes.length||!series||!series.length){el.innerHTML='<div class="empty">暂无变现评分数据</div>';return}
+  const w=440,h=330,cx=w/2,cy=h/2+6,r=112,n=axes.length;
+  const pt=(i,v)=>{const a=-Math.PI/2+i*2*Math.PI/n,rr=r*clamp(Number(v)||0,0,100)/100;return [cx+Math.cos(a)*rr,cy+Math.sin(a)*rr]};
+  let g='';
+  for(let k=1;k<=4;k++){
+    const poly=Array.from({length:n},(_,i)=>pt(i,k*25).map(x=>x.toFixed(1)).join(',')).join(' ');
+    g+=`<polygon points="${poly}" fill="none" stroke="${C.grid}" stroke-width="1"/>`;
+  }
+  axes.forEach((a,i)=>{
+    const [x,y]=pt(i,100);
+    g+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${C.grid}"/>`;
+    const [lx,ly]=pt(i,122);
+    g+=`<text x="${lx.toFixed(1)}" y="${(ly+4).toFixed(1)}" text-anchor="middle" style="font-size:11px;fill:${C.muted};font-weight:600">${esc(a)}</text>`;
+  });
+  series.forEach(s=>{
+    const poly=s.values.map((v,i)=>pt(i,v).map(x=>x.toFixed(1)).join(',')).join(' ');
+    g+=`<polygon points="${poly}" fill="${s.color}" fill-opacity=".16" stroke="${s.color}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    s.values.forEach((v,i)=>{const [x,y]=pt(i,v);g+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${s.color}" data-tip="${esc(s.name+' · '+axes[i]+'：'+v)}"/>`});
+  });
+  g+=series.map((s,i)=>`<g transform="translate(${cx-90+i*130},${h-8})"><rect width="9" height="9" rx="2" fill="${s.color}"/><text class="glbl" x="14" y="8">${esc(s.name)}</text></g>`).join('');
+  el.innerHTML=svg(w,h,g);
+}
+function tableHTML(headers,rows){
+  return `<table><thead><tr>${headers.map(h=>`<th${h.key?` class="sortable" data-key="${h.key}"`:''}>${esc(h.label)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${headers.map(h=>`<td>${h.raw?r[h.key]:esc(r[h.key])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+/* ============ 渲染 ============ */
+function renderHeader(){
+  const m=R.meta;
+  $('#srcPill').className='pill '+(m.is_demo?'demo':'live');
+  $('#srcPill').innerHTML=`<i class="dot"></i>${m.is_demo?'合成演示数据':'授权数据 · '+esc(m.data_source)}`;
+  $('#timePill').textContent='更新 '+m.generated_at.slice(0,16).replace('T',' ');
+  $('#ver').textContent=m.version;
+  $('#footMeta').textContent=`${m.counts.bloggers} 位博主 · ${nf0(m.counts.works)} 条作品 · ${nf0(m.counts.comments)} 条评论`;
+  if(m.is_demo)$('#demoWarn').innerHTML=`<div class="warnbar"><span>⚠️</span><span>当前为固定随机种子（${m.seed}）生成的合成演示数据，所有数字仅用于验证分析口径与界面效果，不代表任何真实账号，请勿外发为业务结论。</span></div>`;
+  else{
+    const rec=m.reconciliation||{},fr=m.freshness||{};
+    const notes=[...new Set([...(rec.notes||[]),...((R.data_quality||{}).warnings||[])])];
+    const bits=[`<b>真实数据已接入</b> · 来源 ${esc(m.data_source)}`];
+    if(fr.last_ingest_at)bits.push(`入库 ${esc(fr.last_ingest_at.slice(0,16).replace('T',' '))}`);
+    if(m.counts.comments===0)bits.push('评论维度为空态');
+    if(m.counts.fan_snapshots<=m.counts.bloggers)bits.push('粉丝快照不足，增长曲线仅供参考');
+    if(notes.length)bits.push(...notes.slice(0,4));
+    $('#demoWarn').innerHTML=`<div class="infobar"><span>ℹ️</span><span>${bits.join('<br>')}</span></div>`;
+  }
+}
+function renderKPI(){
+  $('#kpiGrid').innerHTML=R.kpi.map(k=>{
+    const big=k.value>=100000?wan(k.value):nf(k.value);
+    const valHtml=(k.unit==='¥'?'¥':'')+big+(k.unit==='¥'?'':`<span class="unit">${esc(k.unit)}</span>`);
+    return `<div class="kpi"><div class="lab">${esc(k.label)}${badge(k.credibility)}</div>
+      <div class="val num">${valHtml}</div>
+      <div class="sub">${esc(k.sub)}</div>${k.spark&&k.spark.length>1?`<div class="spark">${sparkline(k.spark)}</div>`:''}</div>`;
+  }).join('');
+}
+function renderOverview(){
+  const ind=R.industry;
+  hbars($('#industryChart'),ind.map((d,i)=>({
+    name:d.name,value:d.followers,color:color(i),
+    label:wan(d.followers),sub:`${d.avg_interaction.toFixed(2)}% · ${d.monetization_score.toFixed(0)} 分`,
+    tip:`${d.name}\n合计粉丝 ${nf0(d.followers)}\n博主 ${d.bloggers} 位\n中位互动率 ${d.avg_interaction}%\n7日增速 ${d.growth_7d}%\n变现评分 ${d.monetization_score}`
+  })));
+  const tiers=R.fans.tiers.map((t,i)=>({name:t.name,value:t.count,color:[C.primary,C.cyan,C.amber][i]}));
+  donut($('#tierDonut'),tiers,{center:nf0(tiers.reduce((a,b)=>a+b.value,0)),label:'位博主'});
+  legend($('#tierLegend'),tiers);
+  const pc={};R.bloggers.forEach(b=>pc[b.platform]=(pc[b.platform]||0)+1);
+  hbars($('#platformBox'),Object.entries(pc).map(([k,v],i)=>({name:k,value:v,color:color(i+3),label:v+' 位'})),{});
+}
+const RANK_TABS=[
+  {key:'growth',title:'涨粉速率榜',sub:'7 日增速 · 派生',unit:'%'},
+  {key:'interaction',title:'互动率榜',sub:'中位互动率 · 派生',unit:'%'},
+  {key:'monetization',title:'变现评分榜',sub:'加权排序分 · 估算',unit:' 分'},
+  {key:'risk',title:'掉粉预警榜',sub:'30 日净增为负 · 派生',unit:'%'},
+];
+let rankKey='growth';
+function renderRanks(){
+  $('#rankTabs').innerHTML=RANK_TABS.map(t=>`<button class="tab ${t.key===rankKey?'on':''}" data-k="${t.key}">${t.title.replace('榜','')}</button>`).join('');
+  $$('#rankTabs .tab').forEach(b=>b.onclick=()=>{rankKey=b.dataset.k;renderRanks()});
+  const t=RANK_TABS.find(x=>x.key===rankKey),list=R.rankings[rankKey];
+  $('#rankTitle').textContent=t.title;$('#rankSub').textContent=t.sub;
+  $('#rankBody').innerHTML=list.length?list.map((r,i)=>`<div class="rank">
+    <div class="no">${i+1}</div>
+    <div><div class="nm">${esc(r.nickname)} <span class="chip ${r.platform==='抖音'?'dy':'xhs'}">${esc(r.platform)}</span></div>
+      <div class="meta">${esc(r.industry)} · ${wan(r.followers)} 粉丝 · ${r.id}</div></div>
+    <div class="v ${rankKey==='risk'?'neg':(r.value>=0?'pos':'neg')}">${r.value>0&&rankKey==='growth'?'+':''}${r.value}${t.unit}</div></div>`).join('')
+    :'<div class="note">当前无掉粉预警样本 ✅</div>';
+}
+function renderGrowth(){
+  const opts=['全平台合计',...R.fans.by_industry.map(x=>x.name)];
+  const sel=$('#growthSelect');sel.innerHTML=opts.map(o=>`<option>${esc(o)}</option>`).join('');
+  const draw=()=>{
+    const v=sel.value;
+    const base=(v==='全平台合计'?R.fans.series:(R.fans.by_industry.find(x=>x.name===v)||{}).series)||[];
+    lineChart($('#growthChart'),[{name:v,color:C.primary,points:base}]);
+    const first=base[0]?.value||0,last=base.at(-1)?.value||0;
+    $('#growthNote').textContent=`区间 ${base[0]?.date||'-'} → ${base.at(-1)?.date||'-'}，净增 ${nf0(last-first)}（${((last-first)/(first||1)*100).toFixed(2)}%）。曲线来自每日粉丝快照，非平台推算值。`;
+  };
+  sel.onchange=draw;draw();
+  hbars($('#convChart'),R.fans.conversion.map((d,i)=>({name:d.nickname,value:Math.max(0,d.value),color:color(i),
+    label:d.value.toFixed(1),sub:'每万播放涨粉'})));
+  $('#inflectList').innerHTML=R.fans.inflections.map(x=>`<div class="li-item"><div class="t">${esc(x.date)} · 日净增 ${nf0(x.delta)}</div>
+    <div class="d">环比 ${x.pct>=0?'+':''}${x.pct}%，建议回看当日发布作品与投放记录。</div></div>`).join('');
+}
+function renderContent(){
+  comboChart($('#hourChart'),R.works.hour_dist.map(d=>({hour:String(d.hour).padStart(2,'0'),count:d.count,ir:d.avg_interaction})));
+  heatmap($('#heatChart'),R.works.heat);
+  hbars($('#durBox'),R.works.duration_bins.map((d,i)=>({name:d.label,value:d.count,color:color(i),label:d.count+' 条',sub:d.avg_interaction+'% 互动'})));
+  hbars($('#coverBox'),R.works.cover_perf.map((d,i)=>({name:d.name,value:d.avg_interaction,color:color(i+1),label:d.avg_interaction+'%',sub:d.count+' 条'})));
+  hbars($('#tagBox'),R.works.tag_dist.map((d,i)=>({name:d.name,value:d.count,color:color(i+2),label:d.count+' 条',sub:d.avg_interaction+'% 互动'})));
+  const v=R.works.viral;
+  const facts=[
+    ['高互动阈值',v.threshold_interaction+'%'],['样本量',v.count+' 条'],
+    ['平均时长',v.avg_duration+' 秒'],['最高频封面',(v.top_cover[0]||['-',0])[0]],
+    ['最高频标签',(v.top_tag[0]||['-',0])[0]],['高频时段',(v.top_hour[0]||['-',0])[0]+':00'],
+  ];
+  $('#viralBox').innerHTML=`<div class="metric-row" style="grid-template-columns:repeat(2,1fr)">${facts.map(f=>`<div class="metric-box"><b>${esc(f[1])}</b><span>${esc(f[0])}</span></div>`).join('')}</div>
+    <div class="note">「高互动」= 全样本互动率 Top 10%，是描述性统计，不构成爆款因果模型。</div>`;
+  $('#viralList').innerHTML=v.samples.map(s=>`<div class="li-item"><div class="t">${esc(s.title)}</div>
+    <div class="d">互动率 ${s.interaction}% · ${wan(s.views)} 播放 · ${esc(s.cover)}</div></div>`).join('');
+}
+function renderAudience(){
+  const c=R.comments,d=c.sentiment_dist;
+  const segs=[{name:'正面',value:d.正面,color:C.cyan},{name:'中性',value:d.中性,color:C.amber},{name:'负面',value:d.负面,color:C.red}];
+  donut($('#sentDonut'),segs,{size:170,center:c.total.toLocaleString('zh-CN'),label:'条评论'});
+  legend($('#sentLegend'),segs);
+  $('#sentMetrics').innerHTML=[
+    [c.avg_sentiment.toFixed(3),'平均情感分'],[(c.effective_rate*100).toFixed(1)+'%','有效评论率'],
+    [(c.reply_rate*100).toFixed(1)+'%','博主回复率']
+  ].map(x=>`<div class="metric-box"><b>${x[0]}</b><span>${x[1]}</span></div>`).join('');
+  const max=Math.max(...c.keywords.map(k=>k.count),1);
+  $('#cloud').innerHTML=c.keywords.length?c.keywords.map(k=>{
+    const size=12+Math.round(13*Math.sqrt(k.count/max));
+    const bg=k.sentiment>0.58?C.cyan:(k.sentiment<0.45?C.red:C.muted);
+    return `<span style="font-size:${size}px;color:${bg};background:color-mix(in srgb,${bg} 11%,transparent)"
+      data-tip="${esc(k.word+'\n出现 '+k.count+' 次\n上下文情感 '+k.sentiment)}">${esc(k.word)}</span>`;
+  }).join(''):'<div class="empty" style="width:100%">暂无评论数据</div>';
+  $('#nlpEngine').textContent=c.engine;
+  $('#controList').innerHTML=c.controversies.length?c.controversies.map(x=>`<div class="li-item">
+    <div class="t">${esc(x.work_id)} · ${x.negative_count} 条负面</div>
+    <div class="d">高频话题：${esc(x.topics.join('、')||'无显著词')}　｜　示例：${esc(x.sample)}</div></div>`).join('')
+    :'<div class="note">未发现集中负面讨论样本 ✅</div>';
+}
+function renderShop(){
+  hbars($('#catChart'),R.shop.categories.map((d,i)=>({name:d.name,value:d.gmv_est,color:color(i),
+    label:money(d.gmv_est),sub:`${d.count} SKU · 均价 ¥${d.avg_price}`})));
+  hbars($('#priceBox'),R.shop.price_bands.map((d,i)=>({name:d.name,value:d.count,color:color(i+2),label:d.count+' 个'})));
+  hbars($('#gmvIndBox'),R.shop.gmv_by_industry.map((d,i)=>({name:d.name,value:d.value,color:color(i+4),label:money(d.value)})));
+  $('#prodTable').innerHTML=R.shop.top_products.length?tableHTML([
+    {label:'商品',key:'name'},{label:'品类',key:'category'},{label:'标价',key:'price'},
+    {label:'销量标识',key:'sold_display'},{label:'评分',key:'rating'},{label:'估算 GMV',key:'gmv'},
+  ],R.shop.top_products.map(p=>({name:p.name,category:p.category,price:'¥'+nf(p.price),
+    sold_display:nf0(p.sold_display),rating:p.rating.toFixed(2),gmv:money(p.gmv_est)})))
+    :'<div class="empty">暂无商品台账 · 导入 products.csv 后自动填充</div>';
+}
+function renderMember(){
+  hbars($('#memberPrice'),R.membership.price_bands.map((d,i)=>({name:d.name,value:d.count,color:color(i),label:d.count+' 个账号'})));
+  hbars($('#memberPlat'),R.membership.by_platform.map((d,i)=>({name:d.name,value:d.members,color:color(i+3),
+    label:wan(d.members),sub:`${d.accounts} 账号 · ${money(d.revenue_est)}/月`})));
+  hbars($('#memberFreq'),R.membership.content_freq.slice(0,7).map((d,i)=>({name:d.nickname,value:d.works,color:color(i+1),
+    label:d.works+' 条',sub:'¥'+d.price+'/月'})));
+  hbars($('#penetrationBox'),R.membership.penetration.map((d,i)=>({name:d.nickname,value:d.rate,color:color(i),
+    label:d.rate+'%',sub:`${nf0(d.members)} 人 · ¥${d.price}/月`})));
+}
+function renderMonetize(){
+  radar($('#radarChart'),R.monetization.dimensions,[
+    {name:'TOP 10 均值',color:C.primary,values:R.monetization.radar.map(x=>x.top)},
+    {name:'全样本均值',color:C.cyan,values:R.monetization.radar.map(x=>x.all)},
+  ]);
+  hbars($('#monetInd'),R.monetization.industry_efficiency.map((d,i)=>({name:d.name,value:d.score,color:color(i),
+    label:d.score+' 分',sub:'GMV '+money(d.gmv_est)})));
+  $('#monetTable').innerHTML=tableHTML([
+    {label:'#',key:'rk'},{label:'博主',key:'nickname'},{label:'平台',key:'platform'},{label:'行业',key:'industry'},
+    {label:'粉丝',key:'fans'},{label:'互动率',key:'ir'},{label:'广告',key:'ad'},{label:'带货',key:'shop'},
+    {label:'会员',key:'member'},{label:'综合分',key:'score',raw:true},
+  ],R.monetization.top10.map((r,i)=>({rk:i+1,nickname:r.nickname,platform:r.platform,industry:r.industry,
+    fans:wan(r.followers),ir:r.interaction_rate+'%',ad:r.ad,shop:r.shop,member:r.member,
+    score:`<b style="color:var(--primary)">${r.monetization_score}</b>`})));
+}
+let sortKey='monetization_score',sortDir=-1;
+let viewRows=[];
+function renderTable(){
+  $('#fInd').innerHTML='<option value="">全部行业</option>'+R.industry.map(i=>`<option>${esc(i.name)}</option>`).join('');
+  $('#fPlat').innerHTML='<option value="">全部平台</option>'+[...new Set(R.bloggers.map(b=>b.platform))].map(p=>`<option>${esc(p)}</option>`).join('');
+  $('#fTier').innerHTML='<option value="">全部量级</option>'+['头部','腰部','尾部'].map(t=>`<option>${t}</option>`).join('');
+  const headers=[
+    {label:'博主',key:'nickname'},{label:'平台',key:'platform'},{label:'行业',key:'industry'},{label:'量级',key:'tier'},
+    {label:'粉丝数',key:'followers'},{label:'7日增速',key:'growth_7d'},{label:'30日增速',key:'growth_30d'},
+    {label:'互动率',key:'interaction_rate'},{label:'作品',key:'works'},{label:'GMV 估算',key:'gmv_est'},
+    {label:'变现分',key:'monetization_score'},
+  ];
+  const draw=()=>{
+    const q=$('#q').value.trim().toLowerCase(),fi=$('#fInd').value,fp=$('#fPlat').value,ft=$('#fTier').value;
+    viewRows=R.bloggers.filter(b=>(!fi||b.industry===fi)&&(!fp||b.platform===fp)&&(!ft||b.tier===ft)
+      &&(!q||(b.nickname+b.industry+b.id).toLowerCase().includes(q)))
+      .sort((a,b)=>{const x=a[sortKey],y=b[sortKey];return (typeof x==='string'?x.localeCompare(y,'zh'):x-y)*sortDir});
+    $('#tblCount').textContent=`共 ${viewRows.length} 位博主`;
+    if(!viewRows.length){$('#bloggerTable').innerHTML='<div class="empty">没有匹配的博主，请调整筛选条件</div>';return}
+    const maxScore=100;
+    const rows=viewRows.map(b=>({
+      nickname:`<b>${esc(b.nickname)}</b><div style="font-size:10px;color:var(--faint)">${esc(b.id)}</div>`,
+      platform:`<span class="chip ${b.platform==='抖音'?'dy':'xhs'}">${esc(b.platform)}</span>`,
+      industry:b.industry,tier:b.tier,followers:wan(b.followers),
+      growth_7d:`<span class="${b.growth_7d>=0?'pos':'neg'}">${b.growth_7d>=0?'+':''}${b.growth_7d}%</span>`,
+      growth_30d:`<span class="${b.growth_30d>=0?'pos':'neg'}">${b.growth_30d>=0?'+':''}${b.growth_30d}%</span>`,
+      interaction_rate:b.interaction_rate+'%',works:b.works,gmv_est:money(b.gmv_est),
+      monetization_score:`<span class="bar-mini"><i style="width:${b.monetization_score/maxScore*100}%"></i></span><b>${b.monetization_score}</b>`,
+    }));
+    $('#bloggerTable').innerHTML=tableHTML(headers.map(h=>({label:h.label,key:h.key,raw:['nickname','platform','growth_7d','growth_30d','monetization_score'].includes(h.key)})),rows);
+    $$('#bloggerTable th.sortable').forEach(th=>{
+      th.onclick=()=>{const k=th.dataset.key;sortDir=(k===sortKey)?-sortDir:-1;sortKey=k;draw()};
+      if(th.dataset.key===sortKey)th.style.color='var(--primary)';
+    });
+  };
+  ['#q','#fInd','#fPlat','#fTier'].forEach(s=>$(s).addEventListener('input',draw));
+  draw();
+  $('#btnExportView').onclick=()=>exportCSV(viewRows,'博主明细_当前视图');
+  $('#btnCsv').onclick=()=>exportCSV(R.bloggers,'博主明细_全量');
+}
+function exportCSV(rows,name){
+  const cols=[['id','账号ID'],['nickname','昵称'],['platform','平台'],['industry','行业'],['tier','量级'],
+    ['followers','粉丝数'],['growth_7d','7日增速%'],['growth_30d','30日增速%'],['interaction_rate','中位互动率%'],
+    ['works','作品数'],['gmv_est','橱窗GMV估算'],['monetization_score','变现综合评分']];
+  const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const csv='\ufeff'+[cols.map(c=>q(c[1])).join(','),...rows.map(r=>cols.map(c=>q(r[c[0]])).join(','))].join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=name+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+let insFilter='all';
+function renderInsights(){
+  const tabs=[['all','全部'],['opportunity','机会'],['risk','风险'],['info','观察']];
+  $('#insTabs').innerHTML=tabs.map(t=>`<button class="tab ${insFilter===t[0]?'on':''}" data-k="${t[0]}">${t[1]}</button>`).join('');
+  $$('#insTabs .tab').forEach(b=>b.onclick=()=>{insFilter=b.dataset.k;renderInsights()});
+  const list=R.insights.filter(i=>insFilter==='all'||i.level===insFilter);
+  const label={opportunity:'机会 · OPPORTUNITY',risk:'风险 · RISK',info:'观察 · INFO'};
+  $('#insGrid').innerHTML=list.length?list.map(i=>`<div class="ins ${i.level}"><div class="tag">${esc(i.dimension)} · ${label[i.level]||'观察 · INFO'}</div>
+    <h4>${esc(i.title)}</h4><p>${esc(i.text)}</p><span class="ev">${esc(i.evidence)}</span></div>`).join('')
+    :'<div class="empty" style="grid-column:1/-1">该分类下暂无洞察</div>';
+}
+function renderMethod(){
+  const m=R.meta;
+  $('#methodBody').innerHTML=`
+    <div class="warnbar" style="margin-bottom:18px">${m.is_demo?'演示数据：结论仅用于验证口径':'真实数据源：'+esc(m.data_source)}</div>
+    ${(!m.is_demo&&(m.reconciliation||m.freshness))?`<div class="list" style="margin-bottom:18px">
+      <div class="li-item"><div class="t">数据接入记录</div><div class="d">
+        入库时间：${esc((m.freshness||{}).last_ingest_at||'—')}　｜　水位：${esc((m.freshness||{}).watermark||'—')}<br>
+        ${Object.entries(m.reconciliation||{}).filter(([k,v])=>typeof v==='number')
+          .map(([k,v])=>esc(k)+'：'+v).join('　｜　')||'无回填'}
+      </div></div></div>`:''}
+    <h3 style="font-size:14px">指标计算公式</h3>
+    <table><thead><tr><th>指标</th><th>口径</th><th>级别</th></tr></thead><tbody>
+      ${m.methodology.map(x=>`<tr><td style="white-space:normal"><b>${esc(x.name)}</b></td>
+        <td style="white-space:normal;color:var(--muted)">${esc(x.formula)}</td><td>${badge(x.level)}</td></tr>`).join('')}
+    </tbody></table>
+    <h3 style="font-size:14px;margin-top:24px">数据可信度分级</h3>
+    ${Object.entries(m.credibility).map(([k,v])=>`<div class="leg"><b class="lv-${k}">${v.label}</b><span>${esc(v.hint)}</span></div>`).join('')}
+    <h3 style="font-size:14px;margin-top:24px">官方权限点（以控制台实际下发为准）</h3>
+    <table><thead><tr><th>scope</th><th>说明</th></tr></thead><tbody>
+      ${Object.entries(m.scope_catalog).map(([k,v])=>`<tr><td><code>${esc(k)}</code></td><td style="white-space:normal;color:var(--muted)">${esc(v)}</td></tr>`).join('')}
+    </tbody></table>
+    <h3 style="font-size:14px;margin-top:24px">明确不提供的字段</h3>
+    <div class="list">${R.data_quality.limitations.map(x=>`<div class="li-item">${esc(x)}</div>`).join('')}</div>
+    <h3 style="font-size:14px;margin-top:24px">数据质量自检</h3>
+    <div class="metric-row">${Object.entries(R.data_quality.coverage).map(([k,v])=>`<div class="metric-box"><b>${v}%</b><span>${({blogger_has_works:'博主有作品',work_has_comments:'作品有评论',blogger_has_snapshots:'博主有粉丝快照'})[k]}</span></div>`).join('')}</div>
+    <div class="list" style="margin-top:12px">${R.data_quality.warnings.map(x=>`<div class="li-item">${esc(x)}</div>`).join('')||'<div class="li-item">无异常 ✅</div>'}</div>`;
+}
+
+/* ============ 交互 ============ */
+
+/* ---------- 数据源配置中心 ---------- */
+const LS_SRC = 'vsa-sources';
+const DEF_SRC = {own_accounts:[], acknowledged_risk_accounts:[],
+  oauth:{client_key:'',client_secret:'',redirect_uri:''}, daas:{chanmama:'',qiangua:'',xinbang:''}};
+function loadSrc(){try{return JSON.parse(localStorage.getItem(LS_SRC))||null}catch(e){return null}}
+function saveSrc(c){try{localStorage.setItem(LS_SRC,JSON.stringify(c))}catch(e){}}
+function getSrc(){return Object.assign(JSON.parse(JSON.stringify(DEF_SRC)),loadSrc()||{})}
+const SRC_CHANNELS=[
+  {key:'demo',name:'合成演示数据',desc:'固定随机种子生成，仅供验证界面与口径',cmd:'python3 run.py all'},
+  {key:'import',name:'CSV 台账导入',desc:'达人后台/服务商导出的 5 张 CSV',cmd:'python3 run.py import <台账目录>'},
+  {key:'crawler',name:'公开页合规采集',desc:'白名单内账号的公开主页/作品（含登录墙降级）',cmd:'python3 run.py crawl'},
+  {key:'oauth',name:'官方 OAuth',desc:'企业资质 + 达人授权 code，拉取授权账号自身数据',cmd:'python3 run.py oauth --code <CODE>'},
+  {key:'daas',name:'第三方 DAAS API',desc:'蝉妈妈/千瓜/新榜企业 API 或导出 CSV',cmd:'python3 run.py import <导出CSV目录>'},
+];
+function srcCfgStatus(c){
+  return {
+    demo:true, import:true,
+    crawler:(c.own_accounts||[]).length+(c.acknowledged_risk_accounts||[]).length>0,
+    oauth:!!(c.oauth&&c.oauth.client_key),
+    daas:!!(c.daas&&(c.daas.chanmama||c.daas.qiangua||c.daas.xinbang)),
+  };
+}
+function renderChannels(c){
+  const st=srcCfgStatus(c);
+  $('#srcChannels').innerHTML=SRC_CHANNELS.map(ch=>{
+    const on=st[ch.key];
+    return `<div class="li-item" style="display:flex;gap:12px;align-items:flex-start">
+      <span class="badge ${on?'lv-observed':'lv-estimated'}">${on?'已配置':'未配置'}</span>
+      <div style="flex:1"><div class="t">${esc(ch.name)}</div>
+      <div class="d">${esc(ch.desc)}</div>
+      <div class="d" style="margin-top:3px;font-family:ui-monospace,monospace;font-size:11px;color:var(--primary)">$ ${esc(ch.cmd)}</div></div></div>`;
+  }).join('');
+}
+function renderSources(){
+  const c=getSrc(), m=R.meta, fr=m.freshness||{}, rec=m.reconciliation||{};
+  $('#srcStatusBadge').className='badge '+(m.is_demo?'lv-estimated':'lv-observed');
+  $('#srcStatusBadge').innerHTML=m.is_demo?'演示数据':'授权数据';
+  const items=[
+    ['数据来源', m.data_source],
+    ['构建时间', (m.generated_at||'').slice(0,16).replace('T',' ')],
+    ['入库时间', (fr.last_ingest_at||'—').slice(0,16).replace('T',' ')],
+    ['数据水位', fr.watermark||'—'],
+    ['博主 / 作品 / 评论', `${m.counts.bloggers} / ${nf0(m.counts.works)} / ${nf0(m.counts.comments)}`],
+    ['商品 / 粉丝快照', `${m.counts.products} / ${nf0(m.counts.fan_snapshots)}`],
+  ];
+  $('#srcStatus').innerHTML=items.map(([k,v])=>`<div class="li-item"><div class="t">${esc(k)}</div><div class="d">${esc(v)}</div></div>`).join('')
+    + (rec.notes&&rec.notes.length?`<div class="note">${esc(rec.notes.join('；'))}</div>`:'');
+  renderChannels(c); renderWhite(c); renderCred(c); refreshSrcCmd(c);
+  if(!window.__srcBound){
+    $('#btnSources').onclick=()=>$('#sources').scrollIntoView({behavior:'smooth'});
+    $('#srcExport').onclick=()=>{const blob=new Blob([JSON.stringify(getSrc(),null,2)],{type:'application/json'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='crawl_whitelist.json';a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),2000);};
+    $('#srcImportBtn').onclick=()=>$('#srcImport').click();
+    $('#srcImport').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+      r.onload=()=>{try{const j=JSON.parse(r.result),cfg=getSrc();
+        if(Array.isArray(j.own_accounts))cfg.own_accounts=j.own_accounts;
+        if(Array.isArray(j.acknowledged_risk_accounts))cfg.acknowledged_risk_accounts=j.acknowledged_risk_accounts;
+        if(j.client_key){cfg.oauth.client_key=j.client_key;cfg.oauth.client_secret=j.client_secret||'';cfg.oauth.redirect_uri=j.redirect_uri||'';}
+        if(j.daas)cfg.daas=Object.assign(cfg.daas,j.daas);
+        saveSrc(cfg);renderSources();alert('配置已导入（已与本地存储合并）');}
+      catch(err){alert('导入失败：'+err.message)}e.target.value='';};r.readAsText(f);};
+    $('#srcAddOwn').onclick=()=>{const c2=getSrc();c2.own_accounts.push({platform:'抖音',handle:'',industry:'',type:'own',ack_by:'',ack_at:''});saveSrc(c2);renderWhite(c2);refreshSrcCmd(c2);};
+    $('#srcAddRisk').onclick=()=>{const c2=getSrc();c2.acknowledged_risk_accounts.push({platform:'抖音',handle:'',industry:'',type:'risk',ack_by:'',ack_at:''});saveSrc(c2);renderWhite(c2);refreshSrcCmd(c2);};
+    window.__srcBound=true;
+  }
+}
+function renderWhite(c){
+  const rows=[...c.own_accounts.map(a=>({...a,_risk:false})),...c.acknowledged_risk_accounts.map(a=>({...a,_risk:true}))];
+  if(!rows.length){$('#srcWhite').innerHTML='<div class="empty">暂无白名单账号 · 点击右上角「+ 自有账号」或「+ 竞品账号」添加</div>';return;}
+  const plats=['抖音','小红书','快手','B站'];
+  $('#srcWhite').innerHTML=`<table><thead><tr><th>平台</th><th>账号 handle</th><th>行业</th><th>类型</th>
+    <th>确认人(竞品)</th><th>确认时间</th><th></th></tr></thead><tbody>
+    ${rows.map((a,i)=>`<tr>
+      <td><select data-k="platform" data-i="${i}" data-r="${a._risk}">${plats.map(p=>`<option ${p===a.platform?'selected':''}>${p}</option>`).join('')}</select></td>
+      <td><input style="width:130px" data-k="handle" data-i="${i}" data-r="${a._risk}" value="${esc(a.handle)}" placeholder="如 dy_abc"></td>
+      <td><input style="width:90px" data-k="industry" data-i="${i}" data-r="${a._risk}" value="${esc(a.industry)}" placeholder="美妆"></td>
+      <td><span class="chip ${a._risk?'xhs':'dy'}">${a._risk?'竞品':'自有'}</span></td>
+      <td><input style="width:90px" data-k="ack_by" data-i="${i}" data-r="${a._risk}" value="${esc(a.ack_by||'')}" placeholder="${a._risk?'必填':'—'}"></td>
+      <td><input style="width:110px" data-k="ack_at" data-i="${i}" data-r="${a._risk}" value="${esc(a.ack_at||'')}" placeholder="YYYY-MM-DD"></td>
+      <td><button class="btn" data-del="${i}" data-r="${a._risk}" style="padding:4px 8px">删除</button></td></tr>`).join('')}</tbody></table>`;
+  $('#srcWhite').querySelectorAll('input,select').forEach(el=>{
+    el.oninput=()=>{const c2=getSrc(),i=+el.dataset.i,list=el.dataset.r==='true'?c2.acknowledged_risk_accounts:c2.own_accounts;
+      list[i][el.dataset.k]=el.value;saveSrc(c2);refreshSrcCmd(c2);};});
+  $('#srcWhite').querySelectorAll('button[data-del]').forEach(b=>{
+    b.onclick=()=>{const c2=getSrc(),list=b.dataset.r==='true'?c2.acknowledged_risk_accounts:c2.own_accounts;
+      list.splice(+b.dataset.del,1);saveSrc(c2);renderWhite(c2);refreshSrcCmd(c2);};});
+}
+function renderCred(c){
+  const fields=[
+    {k:'oauth.client_key',l:'OAuth Client Key',ph:'抖音/小红书开放平台'},
+    {k:'oauth.client_secret',l:'OAuth Client Secret',ph:'保密，仅存本机'},
+    {k:'oauth.redirect_uri',l:'OAuth 回调地址',ph:'your-site.example/callback'},
+    {k:'daas.chanmama',l:'蝉妈妈 API Key',ph:'企业 API'},
+    {k:'daas.qiangua',l:'千瓜 API Key',ph:'小红书企业 API'},
+    {k:'daas.xinbang',l:'新榜 API Key',ph:'企业 API'},
+  ];
+  const get=p=>{const [a,b]=p.split('.');return (c[a]||{})[b]||'';};
+  $('#srcCred').innerHTML=fields.map(f=>`<div style="display:flex;flex-direction:column;gap:5px">
+    <label style="font-size:11px;color:var(--muted);font-weight:600">${esc(f.l)}</label>
+    <input type="text" data-k="${f.k}" value="${esc(get(f.k))}" placeholder="${esc(f.ph)}" style="width:100%"></div>`).join('');
+  $('#srcCred').querySelectorAll('input').forEach(el=>{
+    el.oninput=()=>{const c2=getSrc(),[a,b]=el.dataset.k.split('.');c2[a][b]=el.value;saveSrc(c2);refreshSrcCmd(c2);};});
+}
+function refreshSrcCmd(c){
+  renderChannels(c);
+  const cmds=[];
+  if((c.own_accounts||[]).length+(c.acknowledged_risk_accounts||[]).length)cmds.push(['公开页采集白名单','python3 run.py crawl']);
+  if(c.oauth&&c.oauth.client_key)cmds.push(['官方 OAuth 拉取授权账号','python3 run.py oauth --code <AUTHORIZATION_CODE>']);
+  cmds.push(['导入自有/授权导出台账','python3 run.py import <你的台账目录>']);
+  if((c.daas||{}).chanmama||(c.daas||{}).qiangua||(c.daas||{}).xinbang)cmds.push(['第三方 DAAS 导出后导入','python3 run.py import <导出CSV目录>']);
+  $('#srcCommands').innerHTML=cmds.length?cmds.map(([t,cmd])=>`<div class="li-item" style="display:flex;gap:12px;align-items:center">
+    <div style="flex:1"><div class="t">${esc(t)}</div>
+    <div class="d" style="font-family:ui-monospace,monospace;font-size:11.5px;color:var(--primary);word-break:break-all">$ ${esc(cmd)}</div></div>
+    <button class="btn" data-cmd="${esc(cmd)}" style="padding:4px 9px">复制</button></div>`).join('')
+    :'<div class="empty">先配置白名单或凭证，自动生成可执行命令</div>';
+  $('#srcCommands').querySelectorAll('button[data-cmd]').forEach(b=>{
+    b.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(b.dataset.cmd);b.textContent='已复制';setTimeout(()=>b.textContent='复制',1500);};});
+}
+function setTheme(t){
+  document.documentElement.dataset.theme=t;
+  $('#btnTheme').textContent=t==='dark'?'切换浅色':'切换深色';
+  try{localStorage.setItem('vsa-theme',t)}catch(e){}
+}
+function initInteractions(){
+  const saved=(()=>{try{return localStorage.getItem('vsa-theme')}catch(e){return null}})();
+  setTheme(saved||'light');
+  $('#btnTheme').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+  const drawer=$('#drawer'),mask=$('#mask');
+  const open=()=>{drawer.classList.add('open');mask.classList.add('on')};
+  const close=()=>{drawer.classList.remove('open');mask.classList.remove('on')};
+  $('#btnMethod').onclick=open;$('#btnCloseDrawer').onclick=close;mask.onclick=close;
+  const sections=$$('.section');
+  const io=new IntersectionObserver(es=>{
+    es.forEach(e=>{if(e.isIntersecting){$$('.nav').forEach(n=>n.classList.toggle('on',n.getAttribute('href')==='#'+e.target.id))}});
+  },{rootMargin:'-20% 0px -70% 0px'});
+  sections.forEach(s=>io.observe(s));
+  document.addEventListener('keydown',e=>{
+    const typing=/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('#q').focus();$('#q').scrollIntoView({block:'center'});return}
+    if(typing)return;
+    if(e.key.toLowerCase()==='t'){$('#btnTheme').click();return}
+    if(/^[1-9]$/.test(e.key)){sections[Number(e.key)-1]?.scrollIntoView({behavior:'smooth'})}
+    if(e.key==='Escape')close();
+  });
+  const tip=$('#tip');
+  document.addEventListener('mousemove',e=>{
+    const t=e.target.closest?.('[data-tip]');
+    if(t){tip.textContent=t.getAttribute('data-tip');tip.classList.add('on');
+      tip.style.left=Math.min(e.clientX+14,innerWidth-270)+'px';tip.style.top=(e.clientY+16)+'px';}
+    else tip.classList.remove('on');
+  });
+}
+function boot(){
+  renderHeader();renderKPI();renderOverview();renderRanks();renderGrowth();renderContent();
+  renderAudience();renderShop();renderMember();renderMonetize();renderTable();renderInsights();
+  renderMethod();initInteractions();renderSources();
+}
+boot();
+</script>
+</body>
+</html>
