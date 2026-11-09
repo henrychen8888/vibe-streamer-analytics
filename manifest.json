@@ -1,0 +1,142 @@
+{
+  "name": "vibe-streamer-analytics",
+  "version": "1.0.0",
+  "generated_at": "2026-11-09 13:02:17",
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "c8a6b543cefc253f8784be1606b4a76fc014be1ed49c34e58e6199dc7a78ad24",
+      "bytes": 1702
+    },
+    {
+      "path": "README.md",
+      "sha256": "5e1a9aec239c7be8a6027a50cfdf7062fe3fd44f9e3be190627d76afa45cf91f",
+      "bytes": 3756
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "52c32d6b4966abb7338c969c5dee8d5c2c9aabdc8db378c044b66ce4a1fe2472",
+      "bytes": 7099
+    },
+    {
+      "path": "references/guide.md",
+      "sha256": "4c04ad70294c228ba4ab65cf4b3584316a71c655c1fd9f96c2f60e001ccb91de",
+      "bytes": 5376
+    },
+    {
+      "path": "scripts/config.example.json",
+      "sha256": "25ec62b16c923d559f565fb9c97243f06759c11302f867a61b5d7178a903742c",
+      "bytes": 589
+    },
+    {
+      "path": "scripts/crawl_whitelist.example.json",
+      "sha256": "a24ae30213c31ac4204f2f26c0351bf1ef7896e7812d0ee7ae6e3d4c350f70ad",
+      "bytes": 1105
+    },
+    {
+      "path": "scripts/engine/__init__.py",
+      "sha256": "efa1f6af3b0c85114c4665340cd5dec28ec010238d446547ec23df77e09405dc",
+      "bytes": 672
+    },
+    {
+      "path": "scripts/engine/adapters.py",
+      "sha256": "acfa641e99e44af31e86e0b880d053bdf2c06fd1804a8a0095ead9248e3d6126",
+      "bytes": 18233
+    },
+    {
+      "path": "scripts/engine/analytics.py",
+      "sha256": "beea1127b8782f0aa85adc7834edf56c84a23a79e0c35398aea22fdb2877cf85",
+      "bytes": 21655
+    },
+    {
+      "path": "scripts/engine/crawler.py",
+      "sha256": "74bc8214a8054d07e795bb9a6ba33539a0c31f1e38d296ffcfb43e3f198bd955",
+      "bytes": 14246
+    },
+    {
+      "path": "scripts/engine/insights.py",
+      "sha256": "9948f7aa01bf4e22ccc4b64ba899fb6a51561adb8d661dd9ceaa796b6ccb13a8",
+      "bytes": 6671
+    },
+    {
+      "path": "scripts/engine/nlp.py",
+      "sha256": "e3979578bed1e6acf0d1efc1e263ec9eb3fa077f84d46ae5e1a8a4f30d64bae0",
+      "bytes": 9220
+    },
+    {
+      "path": "scripts/engine/reconcile.py",
+      "sha256": "af169115485947f19d3f57b8fd86825721819bb921b224135f05b93e2edf48cf",
+      "bytes": 5002
+    },
+    {
+      "path": "scripts/engine/report.py",
+      "sha256": "eb02037f5100b33f1587761cf62340cfd3bd67f6557363e396d4b26f6a7e8edd",
+      "bytes": 2797
+    },
+    {
+      "path": "scripts/engine/schema.py",
+      "sha256": "cfc854a35762545e82ba8a54cf6c15c6e6cd6519a1c71f28affa90e44d2c6743",
+      "bytes": 3576
+    },
+    {
+      "path": "scripts/engine/seed.py",
+      "sha256": "9927cfbcf57bb1a79791c71ad88f656f7c87bcb410f7e0563d3e6c00e13f41ce",
+      "bytes": 9625
+    },
+    {
+      "path": "scripts/engine/store.py",
+      "sha256": "460a4f12cb54ece510f16c1628cc2e52c84a278daac1b0dd4f9d5ac225c6bba9",
+      "bytes": 6731
+    },
+    {
+      "path": "scripts/engine/validate.py",
+      "sha256": "e51cb53c5af4bc2b4d81c5a53f1d29ccc530bd0e0dc8011d58c78be99516aecf",
+      "bytes": 13924
+    },
+    {
+      "path": "scripts/import_template/bloggers.csv",
+      "sha256": "da2da2961eed1717ef7f07777985ca67da3078b486dc8c38e5e63978381396b1",
+      "bytes": 279
+    },
+    {
+      "path": "scripts/import_template/comments.csv",
+      "sha256": "b6d0161fe1b403189d0bdc11766572edf9c2ae6cc0e13bb2b669c2e33ace41d6",
+      "bytes": 187
+    },
+    {
+      "path": "scripts/import_template/fan_snapshots.csv",
+      "sha256": "3ca0e85b2fb930fd3ab80d623014b7f6759936d8ed20c7b8612f646313d32dda",
+      "bytes": 86
+    },
+    {
+      "path": "scripts/import_template/products.csv",
+      "sha256": "46640fda1b51893b3fd975d8b47e5b65ca15a0c9663eaad55911ba93504514dd",
+      "bytes": 151
+    },
+    {
+      "path": "scripts/import_template/works.csv",
+      "sha256": "6261e43e19b334d4547acea0a0df9abd9dd54d4ac3237d5d94d67030ea79d6f1",
+      "bytes": 217
+    },
+    {
+      "path": "scripts/run.py",
+      "sha256": "f2e56a8a00fc8098e115cd656766d1be10d583242d4a31b85872127c51bb1a56",
+      "bytes": 18258
+    },
+    {
+      "path": "scripts/tests/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "scripts/tests/test_engine.py",
+      "sha256": "e006ca8a33e3ad003e43cddb56deea75fb66ad31214909d0edd3fa0811dbfcfb",
+      "bytes": 18284
+    },
+    {
+      "path": "scripts/web/index.template.html",
+      "sha256": "ac770d8feccaaada6a090f36b05923f28f871f44ae38c318f2531cb4d4235039",
+      "bytes": 72354
+    }
+  ]
+}
