@@ -1,0 +1,31 @@
+{
+  "_说明": "复制为 crawl_whitelist.json 后登记账号。采集器默认「只跑白名单」，不在表内的账号一律拒绝。",
+  "_合规边界": "本采集器只抓公开页可见指标，不做 IP 代理/UA 轮换/签名破解/验证码打码；竞品账号必须显式登记 ack_by 与 ack_at 以示已知风险，风险由操作者承担。",
+  "mode": "whitelist",
+  "own_accounts": [
+    {
+      "platform": "抖音",
+      "handle": "你的抖音号",
+      "sec_uid": "可选，从主页 URL 复制（用户/ 之后那段）",
+      "industry": "美妆",
+      "note": "自有账号，风险最低"
+    },
+    {
+      "platform": "小红书",
+      "handle": "你的小红书号",
+      "user_id": "可选，profile/ 之后那段",
+      "industry": "美妆",
+      "note": "自有账号"
+    }
+  ],
+  "acknowledged_risk_accounts": [
+    {
+      "platform": "抖音",
+      "handle": "竞品账号A",
+      "industry": "美妆",
+      "note": "竞品对标，已知正当竞争边界模糊风险",
+      "ack_by": "操作者姓名/工号",
+      "ack_at": "2026-11-09"
+    }
+  ]
+}
